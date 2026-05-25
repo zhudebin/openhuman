@@ -222,9 +222,9 @@ const de5: TranslationMap = {
   'settings.mascot.characterDesc': 'Charakterbeschreibung',
   'settings.mascot.characterHeading': 'Zeichenüberschrift',
   'settings.mascot.customGifError':
-    'Gib eine HTTPS-.gif-URL, eine Loopback-HTTP-.gif-URL, eine file://-.gif-URL oder einen lokalen .gif-Pfad ein.',
-  'settings.mascot.customGifHeading': 'Eigener GIF-Avatar',
-  'settings.mascot.customGifLabel': 'URL des eigenen GIF-Avatars',
+    'GIF konnte nicht geladen werden. Bitte überprüfe die URL und versuche es erneut.',
+  'settings.mascot.customGifHeading': 'Benutzerdefinierter GIF-Avatar',
+  'settings.mascot.customGifLabel': 'URL für benutzerdefinierten GIF-Avatar',
   'settings.mascot.colorDesc': 'Farbbeschreibung',
   'settings.mascot.colorHeading': 'Farbüberschrift',
   'settings.mascot.loadingLibrary': 'OpenHuman-Bibliothek wird geladen…',
