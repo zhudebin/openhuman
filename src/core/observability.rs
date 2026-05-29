@@ -1146,8 +1146,28 @@ fn is_provider_user_state_message(lower: &str) -> bool {
     //
     // Drops Sentry TAURI-RUST-X9 (~15.7 k events / ~22 h, single user,
     // release openhuman@0.54.0+c25fc8e5fd3e).
+    //
+    // TAURI-RUST-322 (#2929): same direct-mode path but the Composio v3
+    // `/connected_accounts` API returns HTTP 403 instead of 401. This
+    // happens when the BYO API key exists and is syntactically valid but
+    // does not carry the `connected_accounts:read` permission (e.g. a
+    // scoped or legacy key). Wire shape:
+    //
+    //   `[composio-direct] list_connections failed: Composio v3
+    //    connected_accounts failed: HTTP 403`
+    //
+    // 403 from Composio v3 is a user-state condition (key permissions),
+    // not a bug in openhuman_core. Sentry has no remediation path — the
+    // user must regenerate their key with the correct scopes on
+    // app.composio.dev. The polling layer retries every 5 s and the UI
+    // already surfaces the error; flooding Sentry with 1,000+ events per
+    // user adds no signal.
+    //
+    // Drops Sentry TAURI-RUST-322 (1,021 events, multi-release).
     if lower.contains("[composio-direct]")
-        && (lower.contains("http 401") || lower.contains("invalid api key"))
+        && (lower.contains("http 401")
+            || lower.contains("http 403")
+            || lower.contains("invalid api key"))
     {
         return true;
     }
@@ -3840,6 +3860,84 @@ mod tests {
             None,
             "composio-direct 500 with no auth body must NOT demote — it is a real bug shape"
         );
+    }
+
+    // ── TAURI-RUST-322 (#2929): composio-direct 403 (key missing perms) ─
+
+    #[test]
+    fn classifies_composio_direct_403_as_provider_user_state() {
+        // Canonical Sentry TAURI-RUST-322 wire shape — the verbatim
+        // title body from the issue (1,021 events, multi-release). The
+        // Composio v3 `/connected_accounts` endpoint returns HTTP 403
+        // when the BYO API key exists but lacks `connected_accounts:read`
+        // permission. This is a user-state condition; Sentry has no
+        // remediation path.
+        let msg = "[composio-direct] list_connections failed: \
+                   Composio v3 connected_accounts failed: HTTP 403";
+        assert_eq!(
+            expected_error_kind(msg),
+            Some(ExpectedErrorKind::ProviderUserState),
+            "composio-direct HTTP 403 must demote to ProviderUserState (TAURI-RUST-322)"
+        );
+    }
+
+    #[test]
+    fn classifies_composio_direct_403_for_other_ops() {
+        // The `[composio-direct]` + `HTTP 403` arm must cover every op
+        // that can hit a 403 from the Composio v3 tenant (list_tools
+        // prefetch, authorize, etc.) — not just list_connections.
+        let shapes = [
+            // list_tools prefetch of connections hits the 403 wall
+            "[composio-direct] list_tools: prefetch connections failed: \
+             Composio v3 connected_accounts failed: HTTP 403",
+            // list_connections itself (the primary source of the leak)
+            "[composio-direct] list_connections (direct) failed: \
+             Composio v3 connected_accounts failed: HTTP 403",
+            // any future direct-mode op that hits a 403
+            "[composio-direct] composio_list_connections (direct) failed: \
+             Composio v3 connected_accounts failed: HTTP 403",
+        ];
+        for msg in shapes {
+            assert_eq!(
+                expected_error_kind(msg),
+                Some(ExpectedErrorKind::ProviderUserState),
+                "every [composio-direct] op with HTTP 403 must demote to ProviderUserState: {msg}"
+            );
+        }
+    }
+
+    #[test]
+    fn does_not_classify_unrelated_http_403_as_composio_direct_user_state() {
+        // Discrimination test: a 403 that does NOT carry the
+        // `[composio-direct]` prefix must NOT match this arm. Backend-mode
+        // composio 403s and unrelated 403s must remain visible in Sentry.
+        let backend_403 = "[composio] list_connections failed: \
+                           Backend returned 403 Forbidden for GET \
+                           https://api.tinyhumans.ai/agent-integrations/composio/connections";
+        // The backend-mode shape passes through `is_backend_user_error_message`
+        // (4xx matcher), not this arm. Verify it does NOT match this arm.
+        assert!(
+            !lower_contains_composio_direct_auth_wall(backend_403),
+            "backend-mode 403 must NOT match the composio-direct arm"
+        );
+
+        let unrelated_403 = "GitHub API error: HTTP 403: rate limit exceeded";
+        assert_ne!(
+            expected_error_kind(unrelated_403),
+            Some(ExpectedErrorKind::ProviderUserState),
+            "unrelated 403 (no [composio-direct] anchor) must NOT match the composio-direct arm"
+        );
+    }
+
+    // Helper used only in the discrimination test above — mirrors the
+    // exact condition in `is_provider_user_state_message` without
+    // requiring access to the private function.
+    fn lower_contains_composio_direct_auth_wall(msg: &str) -> bool {
+        let lower = msg.to_ascii_lowercase();
+        lower.contains("[composio-direct]")
+            && (lower.contains("http 401")
+                || lower.contains("http 403")
+                || lower.contains("invalid api key"))
     }
 
     // ── TAURI-RUST-34H: backend-wrapped Cloudflare anti-bot interstitial ─
