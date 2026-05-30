@@ -440,6 +440,18 @@ const messages: TranslationMap = {
   'onboarding.apiKeys.openaiOauthHint':
     'Utilisez ChatGPT Plus/Pro (abonnement) ou une clé OpenAI API — les deux ne sont pas requis.',
   'onboarding.apiKeys.openaiOauthOpening': 'Ouverture de la connexion…',
+  'onboarding.apiKeys.openaiOauthConnect': 'Se connecter avec ChatGPT',
+  'onboarding.apiKeys.openaiOauthConnected': 'Connecté avec ChatGPT',
+  'onboarding.apiKeys.openaiOauthCallbackHint':
+    "Après connexion, collez l'URL de redirection complète depuis votre navigateur (commence par {url}).",
+  'onboarding.apiKeys.oauthDesktopOnly':
+    "La connexion à ChatGPT n'est disponible que dans l'application de bureau.",
+  'onboarding.apiKeys.oauthStartFailed':
+    'Impossible de démarrer la connexion à ChatGPT. Réessayez ou utilisez une clé API.',
+  'onboarding.apiKeys.oauthPasteRedirect':
+    "Collez l'URL de redirection depuis votre navigateur après vous être connecté.",
+  'onboarding.apiKeys.oauthCompleteFailed':
+    "La connexion à ChatGPT ne s'est pas terminée. Vérifiez l'URL de redirection et réessayez.",
   'onboarding.apiKeys.finishSignIn': 'Terminer la connexion à ChatGPT',
   'onboarding.apiKeys.orApiKey': 'ou clé API',
   'onboarding.apiKeys.anthropicLabel': 'Clé API Anthropic',

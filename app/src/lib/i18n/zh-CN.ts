@@ -415,6 +415,14 @@ const messages: TranslationMap = {
   'onboarding.apiKeys.openaiOauthHint':
     '使用 ChatGPT Plus/Pro（订阅）或 OpenAI API 密钥 — 并非两者都需要。',
   'onboarding.apiKeys.openaiOauthOpening': '正在打开登录...',
+  'onboarding.apiKeys.openaiOauthConnect': '使用 ChatGPT 登录',
+  'onboarding.apiKeys.openaiOauthConnected': '已通过 ChatGPT 连接',
+  'onboarding.apiKeys.openaiOauthCallbackHint':
+    '登录后，粘贴浏览器中的完整重定向 URL（以 {url} 开头）。',
+  'onboarding.apiKeys.oauthDesktopOnly': 'ChatGPT 登录仅在桌面应用中可用。',
+  'onboarding.apiKeys.oauthStartFailed': '无法启动 ChatGPT 登录。请重试或使用 API 密钥。',
+  'onboarding.apiKeys.oauthPasteRedirect': '登录后，粘贴浏览器中的重定向 URL。',
+  'onboarding.apiKeys.oauthCompleteFailed': 'ChatGPT 登录未完成。请检查重定向 URL 并重试。',
   'onboarding.apiKeys.finishSignIn': '完成 ChatGPT 登录',
   'onboarding.apiKeys.orApiKey': '或 API 键',
   'onboarding.apiKeys.anthropicLabel': 'Anthropic API 密钥',

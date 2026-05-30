@@ -429,6 +429,16 @@ const messages: TranslationMap = {
   'onboarding.apiKeys.openaiOauthHint':
     'ChatGPT Plus/Pro(구독) 또는 OpenAI API 키를 사용하세요. 둘 다 필수는 아닙니다.',
   'onboarding.apiKeys.openaiOauthOpening': '로그인 중…',
+  'onboarding.apiKeys.openaiOauthConnect': 'ChatGPT로 로그인',
+  'onboarding.apiKeys.openaiOauthConnected': 'ChatGPT로 연결됨',
+  'onboarding.apiKeys.openaiOauthCallbackHint':
+    '로그인한 후 브라우저에서 전체 리디렉션 URL을 붙여넣으세요({url}로 시작).',
+  'onboarding.apiKeys.oauthDesktopOnly': 'ChatGPT 로그인은 데스크톱 앱에서만 사용할 수 있습니다.',
+  'onboarding.apiKeys.oauthStartFailed':
+    'ChatGPT 로그인을 시작할 수 없습니다. 다시 시도하거나 API 키를 사용하세요.',
+  'onboarding.apiKeys.oauthPasteRedirect': '로그인한 후 브라우저에서 리디렉션 URL을 붙여넣으세요.',
+  'onboarding.apiKeys.oauthCompleteFailed':
+    'ChatGPT 로그인이 완료되지 않았습니다. 리디렉션 URL을 확인하고 다시 시도하세요.',
   'onboarding.apiKeys.finishSignIn': 'ChatGPT 로그인 완료',
   'onboarding.apiKeys.orApiKey': '또는 API 키',
   'onboarding.apiKeys.anthropicLabel': 'Anthropic API 키',

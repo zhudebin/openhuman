@@ -441,6 +441,18 @@ const messages: TranslationMap = {
   'onboarding.apiKeys.openaiOauthHint':
     'Utilice ChatGPT Plus/Pro (suscripción) o una clave OpenAI API; no se requieren ambas.',
   'onboarding.apiKeys.openaiOauthOpening': 'Abriendo inicio de sesión…',
+  'onboarding.apiKeys.openaiOauthConnect': 'Iniciar sesión con ChatGPT',
+  'onboarding.apiKeys.openaiOauthConnected': 'Conectado con ChatGPT',
+  'onboarding.apiKeys.openaiOauthCallbackHint':
+    'Después de iniciar sesión, pega la URL de redirección completa de tu navegador (empieza por {url}).',
+  'onboarding.apiKeys.oauthDesktopOnly':
+    'El inicio de sesión con ChatGPT solo está disponible en la aplicación de escritorio.',
+  'onboarding.apiKeys.oauthStartFailed':
+    'No se pudo iniciar el inicio de sesión con ChatGPT. Inténtalo de nuevo o usa una clave de API.',
+  'onboarding.apiKeys.oauthPasteRedirect':
+    'Pega la URL de redirección de tu navegador después de iniciar sesión.',
+  'onboarding.apiKeys.oauthCompleteFailed':
+    'El inicio de sesión con ChatGPT no se completó. Comprueba la URL de redirección e inténtalo de nuevo.',
   'onboarding.apiKeys.finishSignIn': 'Finalizar el inicio de sesión en ChatGPT',
   'onboarding.apiKeys.orApiKey': 'o tecla API',
   'onboarding.apiKeys.anthropicLabel': 'Clave API de Anthropic',

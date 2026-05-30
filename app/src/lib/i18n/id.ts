@@ -433,6 +433,16 @@ const messages: TranslationMap = {
   'onboarding.apiKeys.openaiOauthHint':
     'Gunakan ChatGPT Plus/Pro (berlangganan) atau kunci OpenAI API — keduanya tidak diperlukan.',
   'onboarding.apiKeys.openaiOauthOpening': 'Membuka proses masuk…',
+  'onboarding.apiKeys.openaiOauthConnect': 'Masuk dengan ChatGPT',
+  'onboarding.apiKeys.openaiOauthConnected': 'Terhubung dengan ChatGPT',
+  'onboarding.apiKeys.openaiOauthCallbackHint':
+    'Setelah masuk, tempel URL pengalihan lengkap dari browser Anda (dimulai dengan {url}).',
+  'onboarding.apiKeys.oauthDesktopOnly': 'Masuk ChatGPT hanya tersedia di aplikasi desktop.',
+  'onboarding.apiKeys.oauthStartFailed':
+    'Tidak dapat memulai proses masuk ChatGPT. Coba lagi atau gunakan kunci API.',
+  'onboarding.apiKeys.oauthPasteRedirect': 'Tempel URL pengalihan dari browser Anda setelah masuk.',
+  'onboarding.apiKeys.oauthCompleteFailed':
+    'Proses masuk ChatGPT tidak selesai. Periksa URL pengalihan dan coba lagi.',
   'onboarding.apiKeys.finishSignIn': 'Selesaikan proses masuk ChatGPT',
   'onboarding.apiKeys.orApiKey': 'atau kunci API',
   'onboarding.apiKeys.anthropicLabel': 'API key Anthropic',

@@ -434,6 +434,17 @@ const messages: TranslationMap = {
   'onboarding.apiKeys.openaiOauthHint':
     'Используйте ChatGPT Plus/Pro (подписка) или ключ OpenAI API — не оба обязательны.',
   'onboarding.apiKeys.openaiOauthOpening': 'Открытие входа…',
+  'onboarding.apiKeys.openaiOauthConnect': 'Войти через ChatGPT',
+  'onboarding.apiKeys.openaiOauthConnected': 'Подключено через ChatGPT',
+  'onboarding.apiKeys.openaiOauthCallbackHint':
+    'После входа вставьте полный URL перенаправления из браузера (начинается с {url}).',
+  'onboarding.apiKeys.oauthDesktopOnly':
+    'Вход через ChatGPT доступен только в десктопном приложении.',
+  'onboarding.apiKeys.oauthStartFailed':
+    'Не удалось начать вход через ChatGPT. Повторите попытку или используйте ключ API.',
+  'onboarding.apiKeys.oauthPasteRedirect': 'Вставьте URL перенаправления из браузера после входа.',
+  'onboarding.apiKeys.oauthCompleteFailed':
+    'Вход через ChatGPT не завершён. Проверьте URL перенаправления и повторите попытку.',
   'onboarding.apiKeys.finishSignIn': 'Завершите вход в ChatGPT',
   'onboarding.apiKeys.orApiKey': 'или ключ API',
   'onboarding.apiKeys.anthropicLabel': 'API-ключ Anthropic',

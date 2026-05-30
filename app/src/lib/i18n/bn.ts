@@ -430,6 +430,17 @@ const messages: TranslationMap = {
   'onboarding.apiKeys.openaiOauthHint':
     'ChatGPT Plus/Pro (সাবস্ক্রিপশন) বা একটি OpenAI API কী ব্যবহার করুন — উভয়ের প্রয়োজন নেই।',
   'onboarding.apiKeys.openaiOauthOpening': 'সাইন-ইন খোলা হচ্ছে...',
+  'onboarding.apiKeys.openaiOauthConnect': 'ChatGPT দিয়ে সাইন ইন করুন',
+  'onboarding.apiKeys.openaiOauthConnected': 'ChatGPT দিয়ে সংযুক্ত',
+  'onboarding.apiKeys.openaiOauthCallbackHint':
+    'সাইন ইন করার পরে, আপনার ব্রাউজার থেকে সম্পূর্ণ রিডাইরেক্ট URL পেস্ট করুন ({url} দিয়ে শুরু হয়)।',
+  'onboarding.apiKeys.oauthDesktopOnly': 'ChatGPT সাইন-ইন শুধুমাত্র ডেস্কটপ অ্যাপে উপলব্ধ।',
+  'onboarding.apiKeys.oauthStartFailed':
+    'ChatGPT সাইন-ইন শুরু করা যায়নি। আবার চেষ্টা করুন বা একটি API কী ব্যবহার করুন।',
+  'onboarding.apiKeys.oauthPasteRedirect':
+    'সাইন ইন করার পরে আপনার ব্রাউজার থেকে রিডাইরেক্ট URL পেস্ট করুন।',
+  'onboarding.apiKeys.oauthCompleteFailed':
+    'ChatGPT সাইন-ইন সম্পূর্ণ হয়নি। রিডাইরেক্ট URL পরীক্ষা করুন এবং আবার চেষ্টা করুন।',
   'onboarding.apiKeys.finishSignIn': 'ChatGPT সাইন-ইন শেষ করুন',
   'onboarding.apiKeys.orApiKey': 'বা API কী',
   'onboarding.apiKeys.anthropicLabel': 'Anthropic API কী',

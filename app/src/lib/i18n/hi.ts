@@ -429,6 +429,17 @@ const messages: TranslationMap = {
   'onboarding.apiKeys.openaiOauthHint':
     'चैटजीपीटी प्लस/प्रो (सदस्यता) या OpenAI API कुंजी का उपयोग करें - दोनों की आवश्यकता नहीं है।',
   'onboarding.apiKeys.openaiOauthOpening': 'साइन-इन खुल रहा है...',
+  'onboarding.apiKeys.openaiOauthConnect': 'ChatGPT से साइन इन करें',
+  'onboarding.apiKeys.openaiOauthConnected': 'ChatGPT से कनेक्ट किया गया',
+  'onboarding.apiKeys.openaiOauthCallbackHint':
+    'साइन इन करने के बाद, अपने ब्राउज़र से पूरा रीडायरेक्ट URL पेस्ट करें ({url} से शुरू होता है)।',
+  'onboarding.apiKeys.oauthDesktopOnly': 'ChatGPT साइन-इन केवल डेस्कटॉप ऐप में उपलब्ध है।',
+  'onboarding.apiKeys.oauthStartFailed':
+    'ChatGPT साइन-इन शुरू नहीं किया जा सका। पुनः प्रयास करें या API कुंजी का उपयोग करें।',
+  'onboarding.apiKeys.oauthPasteRedirect':
+    'साइन इन करने के बाद अपने ब्राउज़र से रीडायरेक्ट URL पेस्ट करें।',
+  'onboarding.apiKeys.oauthCompleteFailed':
+    'ChatGPT साइन-इन पूरा नहीं हुआ। रीडायरेक्ट URL जांचें और पुनः प्रयास करें।',
   'onboarding.apiKeys.finishSignIn': 'चैटजीपीटी साइन-इन समाप्त करें',
   'onboarding.apiKeys.orApiKey': 'या API कुंजी',
   'onboarding.apiKeys.anthropicLabel': 'Anthropic API कुंजी',
