@@ -2150,6 +2150,24 @@ const en: TranslationMap = {
   'reflections.proposedAction': 'Proposed Action',
   'reflections.act': 'Act',
   'reflections.dismiss': 'Dismiss',
+  'reflections.viewConversation': 'View',
+
+  // Subconscious mode selector
+  'subconscious.mode.label': 'Subconscious Mode',
+  'subconscious.mode.off.title': 'Off',
+  'subconscious.mode.off.desc': 'Subconscious is disabled.',
+  'subconscious.mode.simple.title': 'Simple',
+  'subconscious.mode.simple.desc': 'Read-only observation. Memory and file access only.',
+  'subconscious.mode.aggressive.title': 'Aggressive',
+  'subconscious.mode.aggressive.desc':
+    'Full tool access. Can write, spawn agents, and delegate tasks.',
+  'subconscious.mode.aggressiveWarning':
+    'Aggressive mode gives the subconscious full tool access including writes and sub-agent spawning.',
+  'subconscious.interval.label': 'Frequency',
+  'subconscious.interval.minutes': '{n} min',
+  'subconscious.interval.hours': '{n}h',
+  'subconscious.interval.oneHour': '1 hour',
+  'subconscious.interval.oneDay': '24 hours',
 
   // WhatsApp
   'whatsapp.chatsSynced': 'chats synced',
@@ -4429,14 +4447,6 @@ const en: TranslationMap = {
   'memory.sourceFilterAria': 'Filter by source',
   'calls.comingSoonDescription': 'AI-assisted calls are coming soon. Stay tuned.',
   'whatsapp.title': 'WhatsApp',
-  'subconscious.interval.fiveMinutes': '5 min',
-  'subconscious.interval.tenMinutes': '10 min',
-  'subconscious.interval.fifteenMinutes': '15 min',
-  'subconscious.interval.thirtyMinutes': '30 min',
-  'subconscious.interval.oneHour': '1 hour',
-  'subconscious.interval.sixHours': '6 hours',
-  'subconscious.interval.twelveHours': '12 hours',
-  'subconscious.interval.oneDay': '1 day',
   'subconscious.priority.critical': 'critical',
   'subconscious.priority.important': 'important',
   'subconscious.priority.normal': 'normal',
