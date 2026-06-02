@@ -2674,7 +2674,9 @@ const messages: TranslationMap = {
   'settings.ai.workloadGroupChat': '对话工作负载',
   'settings.ai.disconnectProvider': '断开 {label}',
   'settings.ai.connectProviderLabel': '连接 {label}',
+  'settings.ai.editProviderEndpoint': '编辑 {label} 端点',
   'settings.ai.defaultLocalEndpoint': 'http://localhost:11434/v1',
+  'settings.ai.editEndpoint': '编辑端点',
   'settings.ai.endpointUrlLabel': '端点 URL',
   'settings.ai.localRuntimeHelper':
     '{label} 可访问的位置。默认是 localhost；如需使用共享实例，可指向远程主机（例如 http://10.0.0.4:11434/v1）。',

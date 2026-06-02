@@ -2863,7 +2863,9 @@ const messages: TranslationMap = {
   'settings.ai.workloadGroupChat': 'Groupe de charge chat',
   'settings.ai.disconnectProvider': 'Déconnecter {label}',
   'settings.ai.connectProviderLabel': 'Connecter {label}',
+  'settings.ai.editProviderEndpoint': 'Modifier le point de terminaison {label}',
   'settings.ai.defaultLocalEndpoint': 'http://localhost:11434/v1',
+  'settings.ai.editEndpoint': 'Modifier le point de terminaison',
   'settings.ai.endpointUrlLabel': 'Point de terminaison URL',
   'settings.ai.localRuntimeHelper':
     "Là où {label} est accessible. Par défaut, c'est localhost; pointez ceci vers un hôte distant (par exemple, http://10.0.0.4:11434/v1) pour utiliser une instance partagée.",

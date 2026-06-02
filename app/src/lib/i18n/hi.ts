@@ -2808,7 +2808,9 @@ const messages: TranslationMap = {
   'settings.ai.workloadGroupChat': 'चैट वर्कलोड ग्रुप',
   'settings.ai.disconnectProvider': 'डिस्कनेक्ट करें {label}',
   'settings.ai.connectProviderLabel': 'कनेक्ट करें {label}',
+  'settings.ai.editProviderEndpoint': '{label} समापन बिंदु संपादित करें',
   'settings.ai.defaultLocalEndpoint': 'http://localhost:11434/v1',
+  'settings.ai.editEndpoint': 'समापन बिंदु संपादित करें',
   'settings.ai.endpointUrlLabel': 'समापन बिंदु URL',
   'settings.ai.localRuntimeHelper':
     'जहां {label} पहुंच योग्य है। डिफ़ॉल्ट स्थानीयहोस्ट है; इसे रिमोट होस्ट पर इंगित करें (उदाहरण के लिए, http://10.0.0.4:11434/v1) एक साझा उदाहरण का उपयोग करने के लिए)।',

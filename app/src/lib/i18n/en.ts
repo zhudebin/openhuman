@@ -3067,7 +3067,9 @@ const en: TranslationMap = {
   'settings.ai.workloadGroupChat': 'Chat and conversations',
   'settings.ai.disconnectProvider': 'Disconnect {label}',
   'settings.ai.connectProviderLabel': 'Connect {label}',
+  'settings.ai.editProviderEndpoint': 'Edit {label} endpoint',
   'settings.ai.defaultLocalEndpoint': 'http://localhost:11434/v1',
+  'settings.ai.editEndpoint': 'Edit endpoint',
   'settings.ai.endpointUrlLabel': 'Endpoint URL',
   'settings.ai.localRuntimeHelper':
     'Where {label} is reachable. Default is localhost; point this at a remote host (for example, http://10.0.0.4:11434/v1) to use a shared instance.',

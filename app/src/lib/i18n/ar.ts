@@ -2752,7 +2752,9 @@ const messages: TranslationMap = {
   'settings.ai.workloadGroupChat': 'مجموعة عبء عمل المحادثة',
   'settings.ai.disconnectProvider': 'قطع الاتصال {label}',
   'settings.ai.connectProviderLabel': 'الاتصال {label}',
+  'settings.ai.editProviderEndpoint': 'تعديل نقطة النهاية {label}',
   'settings.ai.defaultLocalEndpoint': 'http://localhost:11434/v1',
+  'settings.ai.editEndpoint': 'تعديل نقطة الاتصال',
   'settings.ai.endpointUrlLabel': 'نقطة النهاية URL',
   'settings.ai.localRuntimeHelper':
     'حيث يمكن الوصول إلى {label}. الإعداد الافتراضي هو المضيف المحلي؛ وجّه هذا إلى مضيف بعيد (مثلًا http://10.0.0.4:11434/v1) لاستخدام نسخة مشتركة.',

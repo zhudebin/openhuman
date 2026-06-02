@@ -2873,7 +2873,9 @@ const messages: TranslationMap = {
   'settings.ai.workloadGroupChat': 'Workload-Gruppenchat',
   'settings.ai.disconnectProvider': 'Trennen {label}',
   'settings.ai.connectProviderLabel': 'Verbinden {label}',
+  'settings.ai.editProviderEndpoint': 'Endpunkt für {label} bearbeiten',
   'settings.ai.defaultLocalEndpoint': 'http://localhost:11434/v1',
+  'settings.ai.editEndpoint': 'Endpunkt bearbeiten',
   'settings.ai.endpointUrlLabel': 'Endpunkt URL',
   'settings.ai.localRuntimeHelper':
     'Wo {label} erreichbar ist. Die Standardeinstellung ist localhost. Richten Sie dies auf einen Remote-Host (z. B. http://10.0.0.4:11434/v1), um eine freigegebene Instanz zu verwenden.',

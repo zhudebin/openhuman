@@ -2812,7 +2812,9 @@ const messages: TranslationMap = {
   'settings.ai.workloadGroupChat': 'Grup beban kerja chat',
   'settings.ai.disconnectProvider': 'Putuskan sambungan {label}',
   'settings.ai.connectProviderLabel': 'Sambungkan {label}',
+  'settings.ai.editProviderEndpoint': 'Ubah titik akhir {label}',
   'settings.ai.defaultLocalEndpoint': 'http://localhost:11434/v1',
+  'settings.ai.editEndpoint': 'Edit titik akhir',
   'settings.ai.endpointUrlLabel': 'Titik Akhir URL',
   'settings.ai.localRuntimeHelper':
     'Dimana {label} bisa dihubungi. Baku adalah localhost; arahkan ini ke host jarak jauh (misalnya, http://10.0.0.4:11434/v1) untuk memakai suatu contoh bersama.',

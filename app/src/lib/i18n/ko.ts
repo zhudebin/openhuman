@@ -2786,7 +2786,9 @@ const messages: TranslationMap = {
   'settings.ai.workloadGroupChat': '채팅 작업 그룹',
   'settings.ai.disconnectProvider': '{label} 연결 끊기',
   'settings.ai.connectProviderLabel': '{label} 연결',
+  'settings.ai.editProviderEndpoint': '{label} 엔드포인트 편집',
   'settings.ai.defaultLocalEndpoint': 'http://localhost:11434/v1',
+  'settings.ai.editEndpoint': '엔드포인트 편집',
   'settings.ai.endpointUrlLabel': '끝점 URL',
   'settings.ai.localRuntimeHelper':
     '{label}에 연결할 수 있는 위치입니다. 기본값은 localhost입니다. 공유 인스턴스를 사용하려면 원격 호스트(예: http://10.0.0.4:11434/v1)를 가리키세요.',

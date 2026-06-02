@@ -2822,7 +2822,9 @@ const messages: TranslationMap = {
   'settings.ai.workloadGroupChat': 'Чат',
   'settings.ai.disconnectProvider': 'Отключить {label}',
   'settings.ai.connectProviderLabel': 'Подключить {label}',
+  'settings.ai.editProviderEndpoint': 'Изменить конечную точку {label}',
   'settings.ai.defaultLocalEndpoint': 'http://localhost:11434/v1',
+  'settings.ai.editEndpoint': 'Изменить конечную точку',
   'settings.ai.endpointUrlLabel': 'Конечная точка URL',
   'settings.ai.localRuntimeHelper':
     'Где доступен {label}. По умолчанию используется локальный хост; укажите это на удаленном хосте (например, http://10.0.0.4:11434/v1), чтобы использовать общий экземпляр.',
