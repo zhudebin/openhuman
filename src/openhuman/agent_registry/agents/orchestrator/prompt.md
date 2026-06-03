@@ -182,13 +182,14 @@ Reach for `memory_tree` when the user asks about prior context that's already be
 Modes:
 
 - `mode: "search_entities"` — resolve a name to a canonical id (e.g. "alice" → `email:alice@example.com`). Call this first when the user mentions someone by name *and* you've decided memory_tree is the right tool.
-- `mode: "query_topic"` — all cross-source mentions of an `entity_id` from `search_entities`.
 - `mode: "query_source"` — filter by `source_kind` (chat/email/document) and `time_window_days`. Use for retrospective "in my email last week…" intents — **not** for live "check my inbox" intents.
-- `mode: "query_global"` — cross-source daily digest over `time_window_days` (7-day digest is pre-loaded into context on session start — only call for a different window or to force refresh).
+- `mode: "smart_walk"` — multi-strategy retrieval (vector + keyword + entity lookup + tree browsing across raw files, wiki summaries, documents, and episodic memories). Best default for an open-ended natural-language question like "what did Alice and I decide on Q2".
+- `mode: "walk"` — agentic multi-turn walk: the LLM navigates summaries and returns a synthesized answer for a natural-language query. Use when you want a guided traversal rather than broad retrieval.
 - `mode: "drill_down"` — expand a coarse `node_id` summary one level.
 - `mode: "fetch_leaves"` — pull raw `chunk_ids` for citation.
+- `mode: "ingest_document"` — write a document into the tree for future retrieval.
 
-Start cheap (query_* summaries), only drill_down/fetch_leaves when you need verbatim content.
+Start cheap (`query_source` / `smart_walk` summaries), only drill_down/fetch_leaves when you need verbatim content.
 
 ## Citations
 
