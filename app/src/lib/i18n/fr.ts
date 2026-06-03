@@ -2574,8 +2574,25 @@ const messages: TranslationMap = {
   'conversations.taskKanban.field.title': 'Titre',
   'conversations.taskKanban.saveChanges': 'Enregistrer les modifications',
   'conversations.taskKanban.deleteCard': 'Supprimer',
+  'conversations.taskKanban.workTask': 'Travailler la tâche',
+  'conversations.taskKanban.startingTask': 'Démarrage…',
   'conversations.taskKanban.updateFailed':
     "Impossible de mettre à jour la tâche; les modifications n'ont pas été enregistrées.",
+  'conversations.taskKanban.sourcesButton': 'Sources',
+  'conversations.taskKanban.source.openExternal': 'Ouvrir la tâche externe',
+  'conversations.taskKanban.source.openExternalShort': 'Ouvrir',
+  'conversations.taskKanban.source.unknownProvider': 'Source inconnue',
+  'conversations.taskKanban.source.urgencyValue': 'Urgence {percent}%',
+  'conversations.taskKanban.sources.desktopOnly':
+    'Les contrôles des sources de tâches sont disponibles dans l’application de bureau.',
+  'conversations.taskKanban.sources.title': 'Sources de tâches',
+  'conversations.taskKanban.sources.statusEnabled': 'Interrogation automatique activée',
+  'conversations.taskKanban.sources.manage': 'Gérer les sources',
+  'conversations.taskKanban.source.title': 'Source',
+  'conversations.taskKanban.source.sourceId': 'ID de source',
+  'conversations.taskKanban.source.externalId': 'ID externe',
+  'conversations.taskKanban.source.repo': 'Dépôt',
+  'conversations.taskKanban.source.urgency': 'Urgence',
   'conversations.toolTimeline.turn': 'tour',
   'conversations.toolTimeline.step': 'Étape',
   'conversations.toolTimeline.workerThread': 'fil worker',
@@ -2691,6 +2708,45 @@ const messages: TranslationMap = {
   'intelligence.tasks.composer.create': 'Créer une tâche',
   'intelligence.tasks.composer.creating': 'Création…',
   'intelligence.tasks.composer.createFailed': 'Impossible de créer la tâche',
+  'intelligence.tasks.sourceList.subtitle':
+    "Tâches de sources en attente de devenir du travail d'agent.",
+  'intelligence.tasks.sourceList.empty': 'Aucune tâche de source en attente.',
+  'intelligence.tasks.sourceList.queued': 'En file',
+  'intelligence.tasks.sourceList.workOnTask': 'Travailler sur la tâche',
+  'intelligence.tasks.sourcePlan.title': 'Affiner la tâche source',
+  'intelligence.tasks.sourcePlan.subtitle':
+    "Vérifiez le brouillon de recherche avant de créer une tâche d'agent.",
+  'intelligence.tasks.sourcePlan.researchAgent': "Brouillon de l'agent de recherche",
+  'intelligence.tasks.sourcePlan.approve': 'Approuver le plan',
+  'intelligence.tasks.sourcePlan.creating': 'Création de la tâche…',
+  'intelligence.tasks.sourcePlan.createFailed': "Impossible de créer la tâche d'agent",
+  'intelligence.tasks.workTaskFailed': 'Impossible de démarrer le travail sur la tâche',
+  'intelligence.workTask.sourceTaskHeading': 'Tâche source :',
+  'intelligence.workTask.repositoryLine': '- Dépôt : {repo}',
+  'intelligence.workTask.externalIdLine': '- ID externe : {externalId}',
+  'intelligence.workTask.urlLine': '- URL : {url}',
+  'intelligence.workTask.closingInstruction':
+    "Commencez par reformuler brièvement le plan d'implémentation concret, puis exécutez-le. Gardez la progression visible dans ce fil et mettez à jour le tableau des tâches lorsque l'état du travail change.",
+  'intelligence.refine.objectiveDefault':
+    "Transformez la tâche source en une tâche d'agent prête à être implémentée : {title}",
+  'intelligence.refine.sourceLine': 'Source : {url}',
+  'intelligence.refine.sourceIntake': 'Source : réception des sources de tâches',
+  'intelligence.refine.repositoryLine': 'Dépôt : {repo}',
+  'intelligence.refine.externalTaskLine': 'Tâche externe : {externalId}',
+  'intelligence.refine.planStep1':
+    'Lisez la tâche source liée et confirmez le comportement exact demandé.',
+  'intelligence.refine.planStep2':
+    "Inspectez les chemins de code pertinents et identifiez la plus petite frontière d'implémentation.",
+  'intelligence.refine.planStep3':
+    "Implémentez le changement avec des tests ciblés autour du comportement visible par l'utilisateur.",
+  'intelligence.refine.planStep4':
+    'Exécutez une validation ciblée et notez les risques résiduels ou le travail de suivi.',
+  'intelligence.refine.acceptance1':
+    "Les exigences de la tâche source sont représentées dans l'implémentation finale.",
+  'intelligence.refine.acceptance2':
+    "Des tests unitaires ou d'intégration pertinents couvrent le comportement modifié.",
+  'intelligence.refine.acceptance3':
+    "Les résultats de la validation et tout risque non résolu sont consignés à l'achèvement.",
   'notifications.card.dismiss': 'Ignorer la notification',
   'notifications.card.importanceTitle': 'Importance : {pct} %',
   'notifications.center.empty': "Aucune notification pour l'instant",
@@ -4357,6 +4413,10 @@ const messages: TranslationMap = {
   'settings.taskSources.github.repo': 'Dépôt (propriétaire/nom, facultatif)',
   'settings.taskSources.github.labels': 'Étiquettes (séparées par des virgules)',
   'settings.taskSources.notion.database': 'ID de la base de données (tableau)',
+  'settings.taskSources.notion.browseDatabases': 'Parcourir les bases de données',
+  'settings.taskSources.notion.loadingDatabases': 'Chargement des bases de données…',
+  'settings.taskSources.notion.selectDatabase': 'Sélectionner une base de données…',
+  'settings.taskSources.notion.noDatabases': 'Aucune base de données trouvée pour cette connexion.',
   'settings.taskSources.linear.team': "ID de l'équipe (facultatif)",
   'settings.taskSources.clickup.team': 'ID de l’espace de travail (équipe) (optionnel)',
   'settings.taskSources.assignedToMe': 'Uniquement les éléments qui me sont attribués',

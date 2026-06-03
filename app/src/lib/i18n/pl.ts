@@ -2550,8 +2550,25 @@ const messages: TranslationMap = {
   'conversations.taskKanban.field.title': 'Tytuł',
   'conversations.taskKanban.saveChanges': 'Zapisz zmiany',
   'conversations.taskKanban.deleteCard': 'Usuń',
+  'conversations.taskKanban.workTask': 'Pracuj nad zadaniem',
+  'conversations.taskKanban.startingTask': 'Uruchamianie…',
   'conversations.taskKanban.updateFailed':
     'Nie udało się zaktualizować zadania; zmian nie zapisano.',
+  'conversations.taskKanban.sourcesButton': 'Źródła',
+  'conversations.taskKanban.source.openExternal': 'Otwórz zadanie zewnętrzne',
+  'conversations.taskKanban.source.openExternalShort': 'Otwórz',
+  'conversations.taskKanban.source.unknownProvider': 'Nieznane źródło',
+  'conversations.taskKanban.source.urgencyValue': 'Pilność {percent}%',
+  'conversations.taskKanban.sources.desktopOnly':
+    'Kontrolki źródeł zadań są dostępne w aplikacji desktopowej.',
+  'conversations.taskKanban.sources.title': 'Źródła zadań',
+  'conversations.taskKanban.sources.statusEnabled': 'Automatyczne odpytywanie włączone',
+  'conversations.taskKanban.sources.manage': 'Zarządzaj źródłami',
+  'conversations.taskKanban.source.title': 'Źródło',
+  'conversations.taskKanban.source.sourceId': 'ID źródła',
+  'conversations.taskKanban.source.externalId': 'ID zewnętrzne',
+  'conversations.taskKanban.source.repo': 'Repozytorium',
+  'conversations.taskKanban.source.urgency': 'Pilność',
   'conversations.toolTimeline.turn': 'tura',
   'conversations.toolTimeline.step': 'Krok',
   'conversations.toolTimeline.workerThread': 'wątek workera',
@@ -2669,6 +2686,45 @@ const messages: TranslationMap = {
   'intelligence.tasks.composer.create': 'Utwórz zadanie',
   'intelligence.tasks.composer.creating': 'Tworzenie…',
   'intelligence.tasks.composer.createFailed': 'Nie udało się utworzyć zadania',
+  'intelligence.tasks.sourceList.subtitle':
+    'Zadania ze źródeł czekające na przekształcenie w pracę agenta.',
+  'intelligence.tasks.sourceList.empty': 'Brak oczekujących zadań ze źródeł.',
+  'intelligence.tasks.sourceList.queued': 'W kolejce',
+  'intelligence.tasks.sourceList.workOnTask': 'Pracuj nad zadaniem',
+  'intelligence.tasks.sourcePlan.title': 'Dopracuj zadanie źródłowe',
+  'intelligence.tasks.sourcePlan.subtitle':
+    'Sprawdź szkic badawczy przed utworzeniem zadania agenta.',
+  'intelligence.tasks.sourcePlan.researchAgent': 'Szkic agenta badawczego',
+  'intelligence.tasks.sourcePlan.approve': 'Zatwierdź plan',
+  'intelligence.tasks.sourcePlan.creating': 'Tworzenie zadania…',
+  'intelligence.tasks.sourcePlan.createFailed': 'Nie udało się utworzyć zadania agenta',
+  'intelligence.tasks.workTaskFailed': 'Nie udało się rozpocząć pracy nad zadaniem',
+  'intelligence.workTask.sourceTaskHeading': 'Zadanie źródłowe:',
+  'intelligence.workTask.repositoryLine': '- Repozytorium: {repo}',
+  'intelligence.workTask.externalIdLine': '- Identyfikator zewnętrzny: {externalId}',
+  'intelligence.workTask.urlLine': '- Adres: {url}',
+  'intelligence.workTask.closingInstruction':
+    'Zacznij od krótkiego powtórzenia konkretnego planu wdrożenia, a następnie go zrealizuj. Utrzymuj widoczność postępów w tym wątku i aktualizuj tablicę zadań, gdy zmienia się stan pracy.',
+  'intelligence.refine.objectiveDefault':
+    'Przekształć zadanie źródłowe w gotowe do wdrożenia zadanie agenta: {title}',
+  'intelligence.refine.sourceLine': 'Źródło: {url}',
+  'intelligence.refine.sourceIntake': 'Źródło: przyjęcie źródła zadań',
+  'intelligence.refine.repositoryLine': 'Repozytorium: {repo}',
+  'intelligence.refine.externalTaskLine': 'Zadanie zewnętrzne: {externalId}',
+  'intelligence.refine.planStep1':
+    'Przeczytaj powiązane zadanie źródłowe i potwierdź dokładnie żądane zachowanie.',
+  'intelligence.refine.planStep2':
+    'Przejrzyj odpowiednie ścieżki kodu i wskaż najmniejszą granicę wdrożenia.',
+  'intelligence.refine.planStep3':
+    'Wdróż zmianę z ukierunkowanymi testami wokół zachowania widocznego dla użytkownika.',
+  'intelligence.refine.planStep4':
+    'Uruchom ukierunkowaną walidację i zapisz wszelkie pozostałe ryzyka lub prace następcze.',
+  'intelligence.refine.acceptance1':
+    'Wymagania zadania źródłowego są odzwierciedlone w ostatecznym wdrożeniu.',
+  'intelligence.refine.acceptance2':
+    'Odpowiednie testy jednostkowe lub integracyjne obejmują zmienione zachowanie.',
+  'intelligence.refine.acceptance3':
+    'Wyniki walidacji i wszelkie nierozwiązane ryzyka są zapisywane po zakończeniu.',
   'notifications.card.dismiss': 'Odrzuć powiadomienie',
   'notifications.card.importanceTitle': 'Ważność: {pct}%',
   'notifications.center.empty': 'Brak powiadomień',
@@ -4330,6 +4386,10 @@ const messages: TranslationMap = {
   'settings.taskSources.github.repo': 'Repozytorium (właściciel/nazwa, opcjonalnie)',
   'settings.taskSources.github.labels': 'Etykiety (rozdzielone przecinkami)',
   'settings.taskSources.notion.database': 'ID bazy danych (tablicy)',
+  'settings.taskSources.notion.browseDatabases': 'Przeglądaj bazy danych',
+  'settings.taskSources.notion.loadingDatabases': 'Ładowanie baz danych…',
+  'settings.taskSources.notion.selectDatabase': 'Wybierz bazę danych…',
+  'settings.taskSources.notion.noDatabases': 'Nie znaleziono baz danych dla tego połączenia.',
   'settings.taskSources.linear.team': 'ID zespołu (opcjonalnie)',
   'settings.taskSources.clickup.team': 'ID przestrzeni roboczej (zespołu, opcjonalnie)',
   'settings.taskSources.assignedToMe': 'Tylko elementy przypisane do mnie',
