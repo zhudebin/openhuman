@@ -1037,7 +1037,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
             namespace: "config",
             function: "get_agent_paths",
             description:
-                "Resolve the agent's filesystem roots (action_dir, workspace_dir, projects_dir) so the UI can render live values instead of hard-coded strings. Read-only.",
+                "Resolve the agent's filesystem roots (action_dir, workspace_dir, projects_dir) so the UI can render live values instead of hard-coded strings. Read-only. Also returns `action_dir_env_override: bool` so the UI knows when OPENHUMAN_ACTION_DIR is forcing the value (Settings → action_dir editing disabled in that case).",
             inputs: vec![],
             outputs: vec![json_output(
                 "paths",
