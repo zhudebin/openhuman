@@ -1951,6 +1951,8 @@ fn memory_retrieval_embedding_and_rpc_model_helpers_round_trip() {
         sealed_at: now,
         deleted: false,
         embedding: None,
+        doc_id: None,
+        version_ms: None,
     };
     let tree = Tree {
         id: "tree-1".into(),
