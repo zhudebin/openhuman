@@ -9,7 +9,7 @@ use super::store::init_run_ledger_schema;
 use super::types::{
     AgentRun, AgentRunListRequest, AgentRunListResponse, AgentRunStatus, AgentRunUpsert, RunEvent,
     RunEventAppend, RunEventListRequest, RunEventListResponse, RunTelemetry, RunTelemetryUpsert,
-    WorkflowRun, WorkflowRunUpsert,
+    WorkflowRun, WorkflowRunListRequest, WorkflowRunListResponse, WorkflowRunUpsert,
 };
 
 const LOG_PREFIX: &str = "[session_db:run_ledger]";
@@ -322,7 +322,8 @@ pub fn list_recent_run_events(
     })
 }
 
-fn get_workflow_run(config: &Config, id: &str) -> Result<Option<WorkflowRun>> {
+pub fn get_workflow_run(config: &Config, id: &str) -> Result<Option<WorkflowRun>> {
+    log::debug!("{LOG_PREFIX} get_workflow_run.entry id={id}");
     crate::openhuman::session_db::store::with_connection(config, |conn| {
         init_run_ledger_schema(conn)?;
         let mut stmt = conn.prepare(
@@ -330,9 +331,100 @@ fn get_workflow_run(config: &Config, id: &str) -> Result<Option<WorkflowRun>> {
                     child_run_ids_json, status, summary, started_at, updated_at, completed_at
              FROM workflow_runs WHERE id = ?1",
         )?;
-        Ok(stmt
+        let run = stmt
             .query_row(params![id], map_workflow_run_row)
-            .optional()?)
+            .optional()?;
+        log::debug!(
+            "{LOG_PREFIX} get_workflow_run.exit id={id} found={}",
+            run.is_some()
+        );
+        Ok(run)
+    })
+}
+
+/// List durable workflow runs, most-recently-updated first, with optional
+/// filters (definition id, status, parent thread) and pagination. Mirrors
+/// [`list_agent_runs`] for the workflow_runs table.
+pub fn list_workflow_runs(
+    config: &Config,
+    request: &WorkflowRunListRequest,
+) -> Result<WorkflowRunListResponse> {
+    log::debug!(
+        "{LOG_PREFIX} list_workflow_runs.entry definition={:?} status={:?} parent_thread={:?} limit={:?} offset={:?}",
+        request.definition_id,
+        request.status,
+        request.parent_thread_id,
+        request.limit,
+        request.offset
+    );
+    crate::openhuman::session_db::store::with_connection(config, |conn| {
+        init_run_ledger_schema(conn)?;
+        let mut where_clauses = Vec::new();
+        let mut values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+
+        if let Some(definition) = request
+            .definition_id
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+        {
+            values.push(Box::new(definition.to_string()));
+            where_clauses.push(format!("definition_id = ?{}", values.len()));
+        }
+        if let Some(status) = request.status.as_deref().filter(|s| !s.trim().is_empty()) {
+            values.push(Box::new(status.to_string()));
+            where_clauses.push(format!("status = ?{}", values.len()));
+        }
+        if let Some(thread) = request
+            .parent_thread_id
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+        {
+            values.push(Box::new(thread.to_string()));
+            where_clauses.push(format!("parent_thread_id = ?{}", values.len()));
+        }
+
+        let where_sql = if where_clauses.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", where_clauses.join(" AND "))
+        };
+        let count_sql = format!("SELECT COUNT(*) FROM workflow_runs {where_sql}");
+        let params_ref: Vec<&dyn rusqlite::types::ToSql> =
+            values.iter().map(|v| v.as_ref()).collect();
+        let count = conn.query_row(&count_sql, params_ref.as_slice(), |row| {
+            row.get::<_, i64>(0)
+        })? as usize;
+
+        let limit = request.limit.unwrap_or(50).min(500) as i64;
+        // `offset` is `u64`; convert checked so a value > i64::MAX surfaces a
+        // clear error instead of wrapping negative and corrupting pagination.
+        let offset = i64::try_from(request.offset.unwrap_or(0))
+            .context("workflow run list offset exceeds i64::MAX")?;
+        values.push(Box::new(limit));
+        let limit_idx = values.len();
+        values.push(Box::new(offset));
+        let offset_idx = values.len();
+
+        let query_sql = format!(
+            "SELECT id, definition_id, parent_thread_id, input_json, phase_states_json,
+                    child_run_ids_json, status, summary, started_at, updated_at, completed_at
+             FROM workflow_runs {where_sql}
+             ORDER BY updated_at DESC
+             LIMIT ?{limit_idx} OFFSET ?{offset_idx}"
+        );
+        let params_ref: Vec<&dyn rusqlite::types::ToSql> =
+            values.iter().map(|v| v.as_ref()).collect();
+        let mut stmt = conn.prepare(&query_sql)?;
+        let rows = stmt.query_map(params_ref.as_slice(), map_workflow_run_row)?;
+        let mut runs = Vec::new();
+        for row in rows {
+            runs.push(row?);
+        }
+        log::debug!(
+            "{LOG_PREFIX} list_workflow_runs.exit count={count} returned={}",
+            runs.len()
+        );
+        Ok(WorkflowRunListResponse { runs, count })
     })
 }
 

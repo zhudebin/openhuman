@@ -265,6 +265,30 @@ pub struct AgentRunListResponse {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct WorkflowRunListRequest {
+    #[serde(default)]
+    pub definition_id: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub parent_thread_id: Option<String>,
+    /// `u64` to match the `TypeSchema::U64` the controller advertises (the RPC
+    /// scalar-coercion layer only handles `U64`). Capped at 500 in `list_workflow_runs`.
+    #[serde(default)]
+    pub limit: Option<u64>,
+    #[serde(default)]
+    pub offset: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowRunListResponse {
+    pub runs: Vec<WorkflowRun>,
+    pub count: usize,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RunEventListRequest {
     pub run_id: String,
     #[serde(default)]
