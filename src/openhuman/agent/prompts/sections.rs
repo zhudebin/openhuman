@@ -400,11 +400,47 @@ impl PromptSection for WorkspaceSection {
         "workspace"
     }
 
-    fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
-        Ok(format!(
-            "## Workspace\n\nWorking directory: `{}`",
-            ctx.workspace_dir.display()
-        ))
+    fn build(&self, _ctx: &PromptContext<'_>) -> Result<String> {
+        // Intentionally does NOT print a hardcoded path: `shell` and the file
+        // tools resolve relative paths against the agent's *action directory*,
+        // which is not `workspace_dir`. Printing `workspace_dir` here used to
+        // point agents at a directory the file tools are sandboxed *out of*,
+        // causing write→read mismatches. Instead, tell the agent to discover
+        // its real working directory at runtime and keep writes/reads there.
+        let mut out = String::from(
+            "## Workspace\n\n\
+             Run `pwd` to confirm your working directory — that is where `shell` runs and \
+             where `file_read`/`file_write` resolve relative paths. Create files in that \
+             directory and read them back from the same place (use the relative path, or \
+             confirm the absolute path with `pwd`). Writes and reads outside your granted \
+             locations (your working directory plus the scratch directory below) are blocked \
+             by the security sandbox.\n\n\
+             Prefer printing results to stdout. Only when output is too large for stdout, \
+             write it to a file in your working directory and read that file back.\n\n",
+        );
+        // Only advertise a concrete scratch path when the dir is actually present
+        // and safe (real dir, not a symlink) — matching the policy grant in
+        // `SecurityPolicy::from_config`. Otherwise fall back to env-var/working-dir
+        // wording so we never point file I/O at a location the sandbox would block.
+        // Read-only check (no fs side effects in prompt rendering).
+        let scratch = crate::openhuman::security::openhuman_scratch_dir();
+        let scratch_granted = std::fs::symlink_metadata(&scratch)
+            .map(|m| !m.file_type().is_symlink() && m.is_dir())
+            .unwrap_or(false);
+        if scratch_granted {
+            let _ = write!(
+                out,
+                "For scratch or temporary files, use the directory `{}` (a granted scratch \
+                 space) or your `$TMPDIR` / `%TEMP%` — never a hardcoded `/tmp/<name>` path.",
+                scratch.display()
+            );
+        } else {
+            out.push_str(
+                "For scratch or temporary files, use `$TMPDIR` / `%TEMP%`, or create them in \
+                 your working directory — never a hardcoded `/tmp/<name>` path, which is blocked.",
+            );
+        }
+        Ok(out)
     }
 }
 
