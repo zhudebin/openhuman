@@ -2863,6 +2863,13 @@ const messages: TranslationMap = {
   'conversations.subagent.statusCompleted': 'terminé',
   'conversations.subagent.statusFailed': 'échoué',
   'conversations.subagent.statusAwaitingUser': "en attente de l'utilisateur",
+  'conversations.agentTaskInsights.title': "Aperçu des tâches de l'agent",
+  'conversations.agentTaskInsights.processSourceTitle': "Source du processus de l'agent",
+  'conversations.agentTaskInsights.stepsHeading': 'Étapes',
+  'conversations.agentTaskInsights.sourcesHeading': 'Sources',
+  'conversations.agentTaskInsights.noSteps': 'Aucune étape enregistrée',
+  'conversations.agentTaskInsights.viewProcessSource':
+    "Voir la source complète du processus de l'agent",
   'daemon.serviceBlockingGate.body': 'Corps',
   'daemon.serviceBlockingGate.downloadHint': 'Indice de téléchargement',
   'daemon.serviceBlockingGate.downloadLatest': 'Télécharger la dernière version',

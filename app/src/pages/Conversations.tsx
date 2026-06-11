@@ -82,6 +82,7 @@ import {
   AgentMessageText,
   BubbleMarkdown,
 } from './conversations/components/AgentMessageBubble';
+import { AgentProcessSourcePanel } from './conversations/components/AgentProcessSourcePanel';
 import { CitationChips, type MessageCitation } from './conversations/components/CitationChips';
 import { SubagentDrawer } from './conversations/components/SubagentDrawer';
 import { TaskKanbanBoard } from './conversations/components/TaskKanbanBoard';
@@ -207,6 +208,9 @@ const Conversations = ({
   // Sub-agent whose full live transcript is open in the drawer, keyed by the
   // owning timeline row's spawn `taskId`. Null when the drawer is closed.
   const [openSubagentTaskId, setOpenSubagentTaskId] = useState<string | null>(null);
+  // Whether the consolidated "Agent Process Source" panel is open (the full
+  // agent-run timeline + visited sources for the current thread).
+  const [showProcessSource, setShowProcessSource] = useState(false);
   const [inputMode, setInputMode] = useState<InputMode>('text');
   const [replyMode, setReplyMode] = useState<ReplyMode>('text');
   const [isRecording, setIsRecording] = useState(false);
@@ -1728,6 +1732,16 @@ const Conversations = ({
                               if (citations.length === 0) return null;
                               return <CitationChips citations={citations} />;
                             })()}
+                            {shouldRenderTimelineBeforeLatestAgentMessage &&
+                              latestVisibleAgentMessage?.id === msg.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowProcessSource(true)}
+                                  data-testid="view-process-source"
+                                  className="px-1 text-[11px] font-medium text-primary-600 hover:underline dark:text-primary-300">
+                                  {t('conversations.agentTaskInsights.viewProcessSource')} →
+                                </button>
+                              )}
                             {latestVisibleMessage?.id === msg.id && (
                               <p className="px-1 text-[10px] text-stone-400 dark:text-neutral-500">
                                 {formatRelativeTime(msg.createdAt)}
@@ -1989,43 +2003,50 @@ const Conversations = ({
                     </div>
                   </div>
                 )}
-              {/* Inference status indicator */}
-              {selectedInferenceStatus && (
-                <div className="flex items-center gap-2 px-1 py-1.5 text-xs text-stone-500 dark:text-neutral-400">
-                  <span className="inline-block w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
-                  <span>
-                    {selectedInferenceStatus.phase === 'thinking' &&
-                      (selectedInferenceStatus.iteration > 0
-                        ? t('chat.thinkingIteration').replace(
-                            '{n}',
-                            String(selectedInferenceStatus.iteration)
-                          )
-                        : t('chat.thinkingDots'))}
-                    {selectedInferenceStatus.phase === 'tool_use' &&
-                      `${
-                        formatTimelineEntry(
-                          activeToolTimelineEntry ?? {
-                            id: 'active-tool',
-                            name: selectedInferenceStatus.activeTool ?? 'tool',
-                            round: selectedInferenceStatus.iteration,
-                            status: 'running',
-                          }
-                        ).title
-                      }...`}
-                    {selectedInferenceStatus.phase === 'subagent' &&
-                      `${
-                        formatTimelineEntry(
-                          activeSubagentTimelineEntry ?? {
-                            id: 'active-subagent',
-                            name: `subagent:${selectedInferenceStatus.activeSubagent ?? ''}`,
-                            round: selectedInferenceStatus.iteration,
-                            status: 'running',
-                          }
-                        ).title
-                      }...`}
-                  </span>
-                </div>
-              )}
+              {/* Inference status indicator.
+                  For the tool_use / subagent phases this line just restates the
+                  active row already shown in the agentic-task-insights timeline,
+                  so suppress it once that timeline is on screen — keep it only
+                  for the `thinking` phase (which has no timeline row yet) or when
+                  there is no timeline to fall back on. */}
+              {selectedInferenceStatus &&
+                (selectedInferenceStatus.phase === 'thinking' ||
+                  selectedThreadToolTimeline.length === 0) && (
+                  <div className="flex items-center gap-2 px-1 py-1.5 text-xs text-stone-500 dark:text-neutral-400">
+                    <span className="inline-block w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
+                    <span>
+                      {selectedInferenceStatus.phase === 'thinking' &&
+                        (selectedInferenceStatus.iteration > 0
+                          ? t('chat.thinkingIteration').replace(
+                              '{n}',
+                              String(selectedInferenceStatus.iteration)
+                            )
+                          : t('chat.thinkingDots'))}
+                      {selectedInferenceStatus.phase === 'tool_use' &&
+                        `${
+                          formatTimelineEntry(
+                            activeToolTimelineEntry ?? {
+                              id: 'active-tool',
+                              name: selectedInferenceStatus.activeTool ?? 'tool',
+                              round: selectedInferenceStatus.iteration,
+                              status: 'running',
+                            }
+                          ).title
+                        }...`}
+                      {selectedInferenceStatus.phase === 'subagent' &&
+                        `${
+                          formatTimelineEntry(
+                            activeSubagentTimelineEntry ?? {
+                              id: 'active-subagent',
+                              name: `subagent:${selectedInferenceStatus.activeSubagent ?? ''}`,
+                              round: selectedInferenceStatus.iteration,
+                              status: 'running',
+                            }
+                          ).title
+                        }...`}
+                    </span>
+                  </div>
+                )}
               {/* Tool call timeline */}
               {selectedThreadToolTimeline.length > 0 &&
                 !shouldRenderTimelineBeforeLatestAgentMessage && (
@@ -2333,6 +2354,11 @@ const Conversations = ({
         subagent={openSubagentEntry?.subagent ?? null}
         status={openSubagentEntry?.status}
         onClose={() => setOpenSubagentTaskId(null)}
+      />
+      <AgentProcessSourcePanel
+        open={showProcessSource}
+        entries={selectedThreadToolTimeline}
+        onClose={() => setShowProcessSource(false)}
       />
     </div>
   );

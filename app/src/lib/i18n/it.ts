@@ -2843,6 +2843,13 @@ const messages: TranslationMap = {
   'conversations.subagent.statusCompleted': 'completato',
   'conversations.subagent.statusFailed': 'non riuscito',
   'conversations.subagent.statusAwaitingUser': "in attesa dell'utente",
+  'conversations.agentTaskInsights.title': 'Approfondimenti attività agente',
+  'conversations.agentTaskInsights.processSourceTitle': "Origine del processo dell'agente",
+  'conversations.agentTaskInsights.stepsHeading': 'Passaggi',
+  'conversations.agentTaskInsights.sourcesHeading': 'Fonti',
+  'conversations.agentTaskInsights.noSteps': 'Nessun passaggio registrato',
+  'conversations.agentTaskInsights.viewProcessSource':
+    "Visualizza l'origine completa del processo dell'agente",
   'daemon.serviceBlockingGate.body': 'Corpo',
   'daemon.serviceBlockingGate.downloadHint': 'Suggerimento di download',
   'daemon.serviceBlockingGate.downloadLatest': "Scarica l'ultima versione",

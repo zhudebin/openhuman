@@ -8,6 +8,7 @@ import { getIsMobile } from './lib/platform';
 import Accounts from './pages/Accounts';
 import Activity from './pages/Activity';
 import Brain from './pages/Brain';
+import AgentInsightsPreview from './pages/dev/AgentInsightsPreview';
 import Home from './pages/Home';
 import Invites from './pages/Invites';
 import Notifications from './pages/Notifications';
@@ -195,6 +196,9 @@ const AppRoutes = () => {
       />
 
       <Route path="/ptt-overlay" element={<PttOverlayPage />} />
+
+      {/* Dev-only visual preview of the Agentic task insights surface. */}
+      <Route path="/dev/agent-insights" element={<AgentInsightsPreview />} />
 
       {/* Default redirect based on auth status */}
       <Route path="*" element={<DefaultRedirect />} />

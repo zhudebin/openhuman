@@ -3333,6 +3333,12 @@ const en: TranslationMap = {
   'conversations.subagent.statusCompleted': 'completed',
   'conversations.subagent.statusFailed': 'failed',
   'conversations.subagent.statusAwaitingUser': 'awaiting user',
+  'conversations.agentTaskInsights.title': 'Agentic task insights',
+  'conversations.agentTaskInsights.processSourceTitle': 'Agent Process Source',
+  'conversations.agentTaskInsights.stepsHeading': 'Steps',
+  'conversations.agentTaskInsights.sourcesHeading': 'Sources',
+  'conversations.agentTaskInsights.noSteps': 'No steps recorded',
+  'conversations.agentTaskInsights.viewProcessSource': 'View full agent process Source',
   'daemon.serviceBlockingGate.body':
     'Retrying in the background. This usually resolves in a few seconds.',
   'daemon.serviceBlockingGate.downloadHint':
