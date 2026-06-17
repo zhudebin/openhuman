@@ -1685,6 +1685,9 @@ const en: TranslationMap = {
     'Re-install this server with the suggested values to apply them: {keys}',
   'mcp.detail.connect': 'Connect',
   'mcp.detail.connecting': 'Connecting...',
+  'mcp.detail.authenticate': 'Sign in',
+  'mcp.detail.authRequired':
+    'This server needs you to sign in or add an access token before it can connect. Click “Sign in” to authenticate.',
   'mcp.detail.disconnect': 'Disconnect',
   'mcp.detail.hideAssistant': 'Hide assistant',
   'mcp.detail.helpConfigure': 'Help me configure',
@@ -1726,6 +1729,7 @@ const en: TranslationMap = {
   'mcp.detail.enable': 'Enable',
   'mcp.detail.disable': 'Disable',
   'mcp.status.disabled': 'Disabled',
+  'mcp.status.unauthorized': 'Sign in needed',
   'mcp.detail.tools': 'Tools',
   'onboarding.skipForNow': 'Skip for Now',
   'onboarding.localAI.continueWithCloud': 'Continue with Cloud',

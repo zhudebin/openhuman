@@ -1325,6 +1325,9 @@ const messages: TranslationMap = {
     '제안 값을 적용하려면 이 서버를 해당 값으로 다시 설치하세요: {keys}',
   'mcp.detail.connect': '연결',
   'mcp.detail.connecting': '연결 중...',
+  'mcp.detail.authenticate': '로그인',
+  'mcp.detail.authRequired':
+    '이 서버에 연결하려면 먼저 로그인하거나 액세스 토큰을 추가해야 합니다. 인증하려면 “로그인”을 클릭하세요.',
   'mcp.detail.disconnect': '연결 끊기',
   'mcp.detail.hideAssistant': '보조 숨기기',
   'mcp.detail.helpConfigure': '구성 도와주세요',
@@ -1342,6 +1345,7 @@ const messages: TranslationMap = {
   'mcp.detail.enable': '활성화',
   'mcp.detail.disable': '비활성화',
   'mcp.status.disabled': '비활성화됨',
+  'mcp.status.unauthorized': '로그인 필요',
   'mcp.detail.tools': '도구',
   'mcp.connectAuth.title': '{name} 연결',
   'mcp.connectAuth.hint':

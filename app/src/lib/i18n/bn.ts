@@ -1330,6 +1330,9 @@ const messages: TranslationMap = {
     'এই সার্ভারে-ইনস্টল করার জন্য পরামর্শ দেওয়া হল: xqxq0x ব্যবহার করুন',
   'mcp.detail.connect': 'সংযোগ করুন',
   'mcp.detail.connecting': 'সংযুক্ত হচ্ছে...',
+  'mcp.detail.authenticate': 'সাইন ইন করুন',
+  'mcp.detail.authRequired':
+    'এই সার্ভারটি সংযোগ করার আগে আপনাকে সাইন ইন করতে বা একটি অ্যাক্সেস টোকেন যোগ করতে হবে। প্রমাণীকরণ করতে “সাইন ইন করুন”-এ ক্লিক করুন।',
   'mcp.detail.disconnect': 'সংযোগ বিচ্ছিন্ন করুন',
   'mcp.detail.hideAssistant': 'সহকারী লুকান',
   'mcp.detail.helpConfigure': 'কনফিগার করতে আমাকে সাহায্য করুন',
@@ -1348,6 +1351,7 @@ const messages: TranslationMap = {
   'mcp.detail.enable': 'সক্রিয় করুন',
   'mcp.detail.disable': 'নিষ্ক্রিয় করুন',
   'mcp.status.disabled': 'নিষ্ক্রিয়',
+  'mcp.status.unauthorized': 'সাইন ইন প্রয়োজন',
   'mcp.detail.tools': 'টুলস',
   'mcp.connectAuth.title': '{name} সংযুক্ত করুন',
   'mcp.connectAuth.hint':

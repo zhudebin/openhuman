@@ -1267,6 +1267,8 @@ const messages: TranslationMap = {
   'mcp.detail.suggestedEnvBody': '使用建议值重新安装此服务器以应用它们：{keys}',
   'mcp.detail.connect': '连接',
   'mcp.detail.connecting': '正在连接...',
+  'mcp.detail.authenticate': '登录',
+  'mcp.detail.authRequired': '此服务器需要您先登录或添加访问令牌才能连接。点击“登录”进行身份验证。',
   'mcp.detail.disconnect': '断开连接',
   'mcp.detail.hideAssistant': '隐藏助手',
   'mcp.detail.helpConfigure': '帮我配置一下',
@@ -1283,6 +1285,7 @@ const messages: TranslationMap = {
   'mcp.detail.enable': '启用',
   'mcp.detail.disable': '禁用',
   'mcp.status.disabled': '已禁用',
+  'mcp.status.unauthorized': '需要登录',
   'mcp.detail.tools': '工具',
   'mcp.connectAuth.title': '连接 {name}',
   'mcp.connectAuth.hint':

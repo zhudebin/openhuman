@@ -1305,6 +1305,9 @@ const messages: TranslationMap = {
   'mcp.detail.suggestedEnvBody': 'أعِد تثبيت هذا الخادم بالقيم المقترحة لتطبيقها: {keys}',
   'mcp.detail.connect': 'اتصال',
   'mcp.detail.connecting': 'جارٍ الاتصال...',
+  'mcp.detail.authenticate': 'تسجيل الدخول',
+  'mcp.detail.authRequired':
+    'يتطلب هذا الخادم تسجيل الدخول أو إضافة رمز وصول قبل أن يتمكن من الاتصال. انقر على “تسجيل الدخول” للمصادقة.',
   'mcp.detail.disconnect': 'قطع الاتصال',
   'mcp.detail.hideAssistant': 'إخفاء المساعد',
   'mcp.detail.helpConfigure': 'ساعدني في التهيئة',
@@ -1322,6 +1325,7 @@ const messages: TranslationMap = {
   'mcp.detail.enable': 'تفعيل',
   'mcp.detail.disable': 'تعطيل',
   'mcp.status.disabled': 'معطّل',
+  'mcp.status.unauthorized': 'يلزم تسجيل الدخول',
   'mcp.detail.tools': 'الأدوات',
   'mcp.connectAuth.title': 'الاتصال بـ {name}',
   'mcp.connectAuth.hint':

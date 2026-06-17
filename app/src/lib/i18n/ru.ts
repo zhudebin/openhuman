@@ -1347,6 +1347,9 @@ const messages: TranslationMap = {
     'Чтобы применить их, переустановите этот сервер с предложенными значениями: {keys}.',
   'mcp.detail.connect': 'Подключитесь',
   'mcp.detail.connecting': 'Подключение...',
+  'mcp.detail.authenticate': 'Войти',
+  'mcp.detail.authRequired':
+    'Этот сервер требует, чтобы вы вошли в систему или добавили токен доступа, прежде чем он сможет подключиться. Нажмите «Войти», чтобы пройти аутентификацию.',
   'mcp.detail.disconnect': 'Отключите',
   'mcp.detail.hideAssistant': 'Скрыть помощника',
   'mcp.detail.helpConfigure': 'Помогите мне настроить',
@@ -1365,6 +1368,7 @@ const messages: TranslationMap = {
   'mcp.detail.enable': 'Включить',
   'mcp.detail.disable': 'Отключить',
   'mcp.status.disabled': 'Отключён',
+  'mcp.status.unauthorized': 'Требуется вход',
   'mcp.detail.tools': 'Инструменты',
   'mcp.connectAuth.title': 'Подключить {name}',
   'mcp.connectAuth.hint':

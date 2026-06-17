@@ -1328,6 +1328,9 @@ const messages: TranslationMap = {
     'इस सर्वर को फिर से स्थापित करने के लिए सुझाए गए मूल्यों के साथ उन्हें लागू करने के लिए: {keys}',
   'mcp.detail.connect': 'कनेक्ट करें',
   'mcp.detail.connecting': 'कनेक्ट हो रहा है...',
+  'mcp.detail.authenticate': 'साइन इन करें',
+  'mcp.detail.authRequired':
+    'कनेक्ट होने से पहले इस सर्वर के लिए आपको साइन इन करना होगा या एक एक्सेस टोकन जोड़ना होगा। प्रमाणित करने के लिए “साइन इन करें” पर क्लिक करें।',
   'mcp.detail.disconnect': 'डिस्कनेक्ट करें',
   'mcp.detail.hideAssistant': 'सहायक छिपाएँ',
   'mcp.detail.helpConfigure': 'कॉन्फ़िगर करने में मेरी सहायता करें',
@@ -1346,6 +1349,7 @@ const messages: TranslationMap = {
   'mcp.detail.enable': 'सक्षम करें',
   'mcp.detail.disable': 'अक्षम करें',
   'mcp.status.disabled': 'अक्षम',
+  'mcp.status.unauthorized': 'साइन इन आवश्यक',
   'mcp.detail.tools': 'उपकरण',
   'mcp.connectAuth.title': '{name} कनेक्ट करें',
   'mcp.connectAuth.hint':

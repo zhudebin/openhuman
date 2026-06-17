@@ -1360,6 +1360,9 @@ const messages: TranslationMap = {
     'Reinstalla questo server con i valori suggeriti per applicarli: {keys}',
   'mcp.detail.connect': 'Connetti',
   'mcp.detail.connecting': 'Connessione in corso...',
+  'mcp.detail.authenticate': 'Accedi',
+  'mcp.detail.authRequired':
+    'Questo server richiede di accedere o di aggiungere un token di accesso prima di potersi connettere. Fai clic su “Accedi” per autenticarti.',
   'mcp.detail.disconnect': 'Disconnetti',
   'mcp.detail.hideAssistant': 'Nascondi assistente',
   'mcp.detail.helpConfigure': 'Aiutami a configurare',
@@ -1378,6 +1381,7 @@ const messages: TranslationMap = {
   'mcp.detail.enable': 'Abilita',
   'mcp.detail.disable': 'Disabilita',
   'mcp.status.disabled': 'Disabilitato',
+  'mcp.status.unauthorized': 'Accesso necessario',
   'mcp.detail.tools': 'Strumenti',
   'mcp.connectAuth.title': 'Connetti {name}',
   'mcp.connectAuth.hint':
