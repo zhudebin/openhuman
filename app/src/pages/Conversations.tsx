@@ -85,6 +85,10 @@ import {
   BubbleMarkdown,
 } from './conversations/components/AgentMessageBubble';
 import { AgentProcessSourcePanel } from './conversations/components/AgentProcessSourcePanel';
+import {
+  BackgroundProcessesPanel,
+  selectBackgroundProcesses,
+} from './conversations/components/BackgroundProcessesPanel';
 import { CitationChips, type MessageCitation } from './conversations/components/CitationChips';
 import { SubagentDrawer } from './conversations/components/SubagentDrawer';
 import { TaskKanbanBoard } from './conversations/components/TaskKanbanBoard';
@@ -221,6 +225,8 @@ const Conversations = ({
   // Sub-agent whose full live transcript is open in the drawer, keyed by the
   // owning timeline row's spawn `taskId`. Null when the drawer is closed.
   const [openSubagentTaskId, setOpenSubagentTaskId] = useState<string | null>(null);
+  // Detached background sub-agents (spawn_async_subagent) panel visibility.
+  const [showBackgroundProcesses, setShowBackgroundProcesses] = useState(false);
   // Whether the consolidated "Agent Process Source" panel is open (the full
   // agent-run timeline + visited sources for the current thread).
   const [showProcessSource, setShowProcessSource] = useState(false);
@@ -1276,6 +1282,12 @@ const Conversations = ({
   const selectedThreadToolTimeline = selectedThreadId
     ? (toolTimelineByThread[selectedThreadId] ?? [])
     : [];
+  // Detached background sub-agents (mode === 'async') spawned in this thread.
+  const backgroundProcesses = useMemo(
+    () => selectBackgroundProcesses(selectedThreadToolTimeline),
+    [selectedThreadToolTimeline]
+  );
+  const runningBackgroundCount = backgroundProcesses.filter(p => p.status === 'running').length;
   // Re-derive the open subagent's live activity (and its row status) from the
   // timeline on every render so the drawer streams token-by-token as
   // subagent_text_delta / subagent_thinking_delta events land in Redux.
@@ -1766,6 +1778,41 @@ const Conversations = ({
             </div>
             {(selectedThreadId ?? firstActiveThreadId) && (
               <ChatFilesChip threadId={(selectedThreadId ?? firstActiveThreadId) as string} />
+            )}
+            {/* Gated on selectedThreadId alone (not the firstActiveThreadId
+                fallback): the panel/badge derive from selectedThreadToolTimeline,
+                which is [] unless a thread is actually selected, so showing the
+                icon for the fallback would render an always-empty panel. */}
+            {selectedThreadId && (
+              <button
+                type="button"
+                data-testid="background-processes-toggle"
+                data-analytics-id="chat-header-background-processes"
+                onClick={() => setShowBackgroundProcesses(true)}
+                aria-label={t('conversations.backgroundTasks.title')}
+                title={
+                  backgroundProcesses.length > 0
+                    ? t('conversations.backgroundTasks.titleWithCount').replace(
+                        '{count}',
+                        String(backgroundProcesses.length)
+                      )
+                    : t('conversations.backgroundTasks.title')
+                }
+                className="relative flex h-7 w-7 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200 transition-colors">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
+                  />
+                </svg>
+                {runningBackgroundCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[9px] font-semibold leading-none text-white">
+                    {runningBackgroundCount}
+                  </span>
+                )}
+              </button>
             )}
             <button
               type="button"
@@ -2586,6 +2633,15 @@ const Conversations = ({
       <ConfirmationModal
         modal={deleteModal}
         onClose={() => setDeleteModal(prev => ({ ...prev, isOpen: false }))}
+      />
+      <BackgroundProcessesPanel
+        open={showBackgroundProcesses}
+        processes={backgroundProcesses}
+        onClose={() => setShowBackgroundProcesses(false)}
+        onOpenProcess={taskId => {
+          setShowBackgroundProcesses(false);
+          setOpenSubagentTaskId(taskId);
+        }}
       />
       <SubagentDrawer
         subagent={openSubagentEntry?.subagent ?? null}

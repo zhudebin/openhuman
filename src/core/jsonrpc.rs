@@ -2245,6 +2245,11 @@ fn register_domain_subscribers(
         // calls instead of importing `run_tool_call_loop` directly.
         crate::openhuman::agent::bus::register_agent_handlers();
 
+        // Background-completion delivery: when a detached sub-agent
+        // (spawn_async_subagent) finishes, surface its result back into the
+        // originating chat as an idle-gated, batched, system-injected turn.
+        crate::openhuman::agent_orchestration::background_delivery::register_background_delivery();
+
         // MCP clients lifecycle subscriber: logs McpServer{Installed,Connected,
         // Disconnected} + McpClientToolExecuted for observability. The boot-time
         // spawn of installed servers (boot::spawn_installed_servers) runs later
