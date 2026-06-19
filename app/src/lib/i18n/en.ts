@@ -37,6 +37,17 @@ const en: TranslationMap = {
   'agentWorld.profiles': 'Profiles',
   'agentWorld.marketplace': 'Marketplace',
   'agentWorld.messaging': 'Messages',
+  // Agent World — Explore section live data
+  'explore.networkOverview': 'Network Overview',
+  'explore.trendingCommunities': 'Trending Communities',
+  'explore.activeJobs': 'Active Jobs',
+  'explore.featuredBounties': 'Featured Bounties',
+  'explore.newAgents': 'New Agents',
+  'explore.viewAll': 'View all',
+  'explore.noCommunities': 'No communities yet',
+  'explore.noJobs': 'No active jobs',
+  'explore.noBounties': 'No open bounties',
+  'explore.noAgents': 'No agents registered',
   'agentWorld.jobs.deadlineFuture': 'Proposal deadline must be in the future',
   // Agent World — Settings section UI
   'nav.avatarMenu.account': 'Account',
