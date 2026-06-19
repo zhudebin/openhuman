@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
+import { ToastContainer } from '../../components/intelligence/Toast';
 import PanelScaffold from '../../components/layout/PanelScaffold';
 import Button from '../../components/ui/Button';
 import { ModalShell } from '../../components/ui/ModalShell';
@@ -27,6 +28,7 @@ import {
   type RegistryWalletBalance,
 } from '../../lib/agentworld/invokeApiClient';
 import { fetchWalletStatus } from '../../services/walletApi';
+import type { ToastNotification } from '../../types/intelligence';
 import { apiClient } from '../AgentWorldShell';
 import X402ConfirmDialog, { formatUnits } from '../components/X402ConfirmDialog';
 import { useX402Buy } from '../hooks/useX402Buy';
@@ -867,6 +869,12 @@ export default function BountiesSection() {
   const [expandedBountyId, setExpandedBountyId] = useState<string | null>(null);
   const [mutating, setMutating] = useState(false);
 
+  // Toast state
+  const [toasts, setToasts] = useState<ToastNotification[]>([]);
+  const addToast = (toast: Omit<ToastNotification, 'id'>) =>
+    setToasts(prev => [...prev, { ...toast, id: crypto.randomUUID() }]);
+  const removeToast = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
+
   // Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [submitWorkBountyId, setSubmitWorkBountyId] = useState<string | null>(null);
@@ -997,6 +1005,20 @@ export default function BountiesSection() {
           onClose={() => setShowCreateModal(false)}
           onCreated={bounty => {
             setShowCreateModal(false);
+            // Show success toast with a "View" action that expands the new row.
+            // The expand state is pre-set here; once the list refetch completes
+            // the row auto-expands. No i18n yet — the entire BountiesSection
+            // uses hardcoded English strings (TODO: i18n when section is
+            // internationalised).
+            addToast({
+              type: 'success',
+              title: 'Bounty created',
+              message: (bounty as Bounty).title,
+              action: {
+                label: 'View',
+                handler: () => setExpandedBountyId((bounty as Bounty).bountyId),
+              },
+            });
             fetchBounties();
             // If the new bounty is a draft, offer to fund it
             if ((bounty as Bounty).status === 'draft') {
@@ -1130,6 +1152,8 @@ export default function BountiesSection() {
           </div>
         </ModalShell>
       )}
+
+      <ToastContainer notifications={toasts} onRemove={removeToast} />
     </PanelScaffold>
   );
 }
