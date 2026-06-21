@@ -20,6 +20,10 @@ const SHELL_JOB_TIMEOUT_SECS: u64 = 120;
 const AGENT_JOB_USER_FAILURE_MESSAGE: &str = "Something went wrong. Please try again.\nThis error has been reported. You can also report it on Discord.\n<openhuman-link path=\"community/discord-report\">Report on Discord</openhuman-link>";
 const MORNING_BRIEFING_AGENT_ID: &str = "morning_briefing";
 const MORNING_BRIEFING_FAILURE_NOTIFICATION: &str = "Morning briefing could not run. Check your AI provider, API key, and connected apps, then run it again from Settings > Cron Jobs.";
+/// Recency window the morning briefing installs around its turn so Composio
+/// task-fetch tools only surface tasks created/changed in the last day. Read
+/// by the `composio_execute` handler via `current_task_recency_window`.
+const MORNING_BRIEFING_TASK_RECENCY_SECS: u64 = 24 * 60 * 60;
 
 /// Map a typed [`AgentError`] to a canned, user-facing message for cron-job
 /// failure notifications.
@@ -578,11 +582,32 @@ async fn run_agent_job(config: &Config, job: &CronJob) -> (bool, String, Option<
                             source:
                                 crate::openhuman::agent::turn_origin::TrustedAutomationSource::Cron,
                         };
-                    crate::openhuman::agent::turn_origin::with_origin(
+                    let turn = crate::openhuman::agent::turn_origin::with_origin(
                         origin,
                         agent.run_single(&prefixed_prompt),
-                    )
-                    .await
+                    );
+                    // Morning briefing only: install a 24h task-recency window
+                    // so Composio task-fetch tools (Linear/ClickUp/Notion/Asana)
+                    // surface only recently created/changed tasks. Other cron
+                    // agents and all chat turns leave the window unset.
+                    if is_morning_briefing_job(job) {
+                        tracing::debug!(
+                            job_id = %job.id,
+                            recency_window_secs = MORNING_BRIEFING_TASK_RECENCY_SECS,
+                            "[cron] applying morning-briefing task recency window"
+                        );
+                        crate::openhuman::agent::harness::with_task_recency_window(
+                            std::time::Duration::from_secs(MORNING_BRIEFING_TASK_RECENCY_SECS),
+                            turn,
+                        )
+                        .await
+                    } else {
+                        tracing::trace!(
+                            job_id = %job.id,
+                            "[cron] task recency window not applied for this job"
+                        );
+                        turn.await
+                    }
                 }
                 Err(e) => Err(e),
             }
