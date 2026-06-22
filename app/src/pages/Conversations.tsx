@@ -319,7 +319,10 @@ const Conversations = ({
     isFreeTier,
     shouldShowBudgetCompletedMessage,
     usagePct,
-  } = useUsageState();
+    // #3767: gate on the tier for the selected chat mode — Quick runs on the
+    // `chat` tier, Reasoning on the `reasoning` tier — so the credits prompt
+    // reflects the mode the user actually picked.
+  } = useUsageState(selectedAgentProfileId === 'reasoning' ? 'reasoning' : 'chat');
   const [deleteModal, setDeleteModal] = useState<ConfirmationModalType>({
     isOpen: false,
     title: '',
