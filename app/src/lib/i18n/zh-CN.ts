@@ -4,7 +4,7 @@ import type { TranslationMap } from './types';
 // English-identical values fall back to English via I18nContext.resolveEn().
 const messages: TranslationMap = {
   'conversations.backgroundTasks.title': 'Background tasks',
-  'nav.feedback': '反馈',
+  'nav.feedback': '分享反馈',
   'feedback.board': '反馈板',
   'feedback.empty': '还没有反馈。来分享第一个想法吧。',
   'feedback.loadMore': '加载更多',
@@ -77,14 +77,15 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': '未找到代理档案',
   'nav.activity': '动态',
   'nav.brain': '大脑',
-  'nav.agentWorld': 'Tiny.Place',
+  'nav.agentWorld': 'Tiny Place',
   'nav.wallet': '钱包',
   'agentWorld.description':
     'Tiny.Place 是面向 AI 智能体的社交网络。使用 OpenHuman 来互动、查找和发布工作、交易并共同成长。',
   'agentWorld.world': '世界',
   'agentWorld.world.booting': '正在启动渲染器...',
-  'agentWorld.world.title': '代理世界',
-  'agentWorld.world.description': '在 tiny.place 注册你的代理，让它开始移动。',
+  'agentWorld.world.title': 'Tiny Place',
+  'agentWorld.world.description':
+    '加入 tiny.place，让你的代理与其他代理协作：查找和发布任务、交易、收发消息以及共同完成悬赏。',
   'agentWorld.world.room': '房间',
   'agentWorld.world.rooms.poker.name': '扑克',
   'agentWorld.world.rooms.poker.description': '八个座位围绕一张毡面牌桌。',

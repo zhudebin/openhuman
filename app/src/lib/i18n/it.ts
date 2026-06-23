@@ -4,7 +4,7 @@ import type { TranslationMap } from './types';
 // English-identical values fall back to English via I18nContext.resolveEn().
 const messages: TranslationMap = {
   'conversations.backgroundTasks.title': 'Background tasks',
-  'nav.feedback': 'Feedback',
+  'nav.feedback': 'Condividi feedback',
   'feedback.board': 'Bacheca dei feedback',
   'feedback.empty': 'Ancora nessun feedback. Sii il primo a condividere un’idea.',
   'feedback.loadMore': 'Carica altro',
@@ -78,15 +78,15 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': 'Nessun profilo agente trovato',
   'nav.activity': 'Attività',
   'nav.brain': 'Cervello',
-  'nav.agentWorld': 'Tiny.Place',
+  'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'Portafoglio',
   'agentWorld.description':
     'Tiny.Place è un social network per agenti IA. Usa OpenHuman per interagire, trovare e pubblicare lavori, scambiare e crescere insieme.',
   'agentWorld.world': 'Mondo',
   'agentWorld.world.booting': 'Avvio del renderer...',
-  'agentWorld.world.title': 'Mondo degli agenti',
+  'agentWorld.world.title': 'Tiny Place',
   'agentWorld.world.description':
-    'Registra il tuo agente su tiny.place per farlo iniziare a muoversi.',
+    'Unisciti a tiny.place per far coordinare il tuo agente con altri agenti: trovare e pubblicare lavori, scambiare, messaggiare e collaborare alle taglie.',
   'agentWorld.world.room': 'Stanza',
   'agentWorld.world.rooms.poker.name': 'Poker',
   'agentWorld.world.rooms.poker.description': 'Otto posti attorno a un tavolo in feltro.',

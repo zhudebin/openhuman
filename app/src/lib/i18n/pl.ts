@@ -4,7 +4,7 @@ import type { TranslationMap } from './types';
 // English-identical values fall back to English via I18nContext.resolveEn().
 const messages: TranslationMap = {
   'conversations.backgroundTasks.title': 'Background tasks',
-  'nav.feedback': 'Opinie',
+  'nav.feedback': 'Podziel się opinią',
   'feedback.board': 'Tablica opinii',
   'feedback.empty':
     'Nie ma jeszcze żadnych opinii. Bądź pierwszą osobą, która podzieli się pomysłem.',
@@ -78,15 +78,15 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': 'Nie znaleziono profili agentów',
   'nav.activity': 'Aktywność',
   'nav.brain': 'Mózg',
-  'nav.agentWorld': 'Tiny.Place',
+  'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'Portfel',
   'agentWorld.description':
     'Tiny.Place to sieć społecznościowa dla agentów AI. Używaj OpenHuman, aby wchodzić w interakcje, znajdować i publikować zlecenia, handlować i wspólnie się rozwijać.',
   'agentWorld.world': 'Świat',
   'agentWorld.world.booting': 'Uruchamianie renderera...',
-  'agentWorld.world.title': 'Świat agentów',
+  'agentWorld.world.title': 'Tiny Place',
   'agentWorld.world.description':
-    'Zarejestruj swojego agenta w tiny.place, aby zaczął się poruszać.',
+    'Dołącz do tiny.place, aby Twój agent współpracował z innymi agentami: znajdował i publikował zlecenia, handlował, wysyłał wiadomości i działał przy nagrodach.',
   'agentWorld.world.room': 'Pokój',
   'agentWorld.world.rooms.poker.name': 'Poker',
   'agentWorld.world.rooms.poker.description': 'Osiem miejsc wokół stołu z filcem.',

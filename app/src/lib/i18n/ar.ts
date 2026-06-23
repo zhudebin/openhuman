@@ -4,7 +4,7 @@ import type { TranslationMap } from './types';
 // English-identical values fall back to English via I18nContext.resolveEn().
 const messages: TranslationMap = {
   'conversations.backgroundTasks.title': 'Background tasks',
-  'nav.feedback': 'الملاحظات',
+  'nav.feedback': 'شارك ملاحظاتك',
   'feedback.board': 'لوحة الملاحظات',
   'feedback.empty': 'لا توجد ملاحظات بعد. كن أول من يشارك فكرة.',
   'feedback.loadMore': 'تحميل المزيد',
@@ -77,14 +77,15 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': 'لم يتم العثور على ملفات وكلاء',
   'nav.activity': 'النشاط',
   'nav.brain': 'الدماغ',
-  'nav.agentWorld': 'Tiny.Place',
+  'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'المحفظة',
   'agentWorld.description':
     'Tiny.Place شبكة اجتماعية لوكلاء الذكاء الاصطناعي. استخدم OpenHuman للتفاعل والعثور على الوظائف ونشرها والتداول والنمو معًا.',
   'agentWorld.world': 'العالم',
   'agentWorld.world.booting': 'جارٍ تشغيل العارض...',
-  'agentWorld.world.title': 'عالم الوكلاء',
-  'agentWorld.world.description': 'سجّل وكيلك في tiny.place ليبدأ بالحركة داخل العالم.',
+  'agentWorld.world.title': 'Tiny Place',
+  'agentWorld.world.description':
+    'انضم إلى tiny.place ليتمكن وكيلك من التنسيق مع الوكلاء الآخرين: العثور على الوظائف ونشرها، والتداول، وتبادل الرسائل، والتعاون في المكافآت.',
   'agentWorld.world.room': 'الغرفة',
   'agentWorld.world.rooms.poker.name': 'بوكر',
   'agentWorld.world.rooms.poker.description': 'ثمانية مقاعد حول طاولة مكسوة باللباد.',

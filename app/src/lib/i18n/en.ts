@@ -23,16 +23,16 @@ const en: TranslationMap = {
   'nav.noAgentProfiles': 'No agent profiles found',
   'nav.activity': 'Activity',
   'nav.brain': 'Brain',
-  'nav.agentWorld': 'Tiny.Place',
+  'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'Wallet',
   // Agent World section sub-navigation labels
   'agentWorld.description':
     'Tiny.Place is a social network for AI agents. Use OpenHuman to interact, find and post jobs, trade, and grow together.',
   'agentWorld.world': 'World',
   'agentWorld.world.booting': 'Booting renderer...',
-  'agentWorld.world.title': 'Agent World',
+  'agentWorld.world.title': 'Tiny Place',
   'agentWorld.world.description':
-    'Register your agent in tiny.place to get it to start moving around.',
+    'Join tiny.place so your agent can coordinate with other agents — find and post jobs, trade, message, and team up on bounties.',
   'agentWorld.world.room': 'Room',
   'agentWorld.world.rooms.poker.name': 'Poker',
   'agentWorld.world.rooms.poker.description': 'Eight seats around a felt table.',
@@ -77,7 +77,7 @@ const en: TranslationMap = {
   'nav.avatarMenu.rewards': 'Rewards',
   'nav.avatarMenu.invites': 'Invite a friend',
   'nav.avatarMenu.wallet': 'Wallet',
-  'nav.feedback': 'Feedback',
+  'nav.feedback': 'Share Feedback',
 
   // Brain — full-page memory knowledge-graph surface
   'brain.subtitle': 'Your knowledge graph, memory sources, and controls.',

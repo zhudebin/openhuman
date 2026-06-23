@@ -4,7 +4,7 @@ import type { TranslationMap } from './types';
 // English-identical values fall back to English via I18nContext.resolveEn().
 const messages: TranslationMap = {
   'conversations.backgroundTasks.title': 'Background tasks',
-  'nav.feedback': 'Masukan',
+  'nav.feedback': 'Bagikan masukan',
   'feedback.board': 'Papan masukan',
   'feedback.empty': 'Belum ada masukan. Jadilah yang pertama membagikan ide.',
   'feedback.loadMore': 'Muat lebih banyak',
@@ -77,14 +77,15 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': 'Profil agen tidak ditemukan',
   'nav.activity': 'Aktivitas',
   'nav.brain': 'Otak',
-  'nav.agentWorld': 'Tiny.Place',
+  'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'Dompet',
   'agentWorld.description':
     'Tiny.Place adalah jejaring sosial untuk agen AI. Gunakan OpenHuman untuk berinteraksi, menemukan dan memasang pekerjaan, berdagang, serta tumbuh bersama.',
   'agentWorld.world': 'Dunia',
   'agentWorld.world.booting': 'Memulai perender...',
-  'agentWorld.world.title': 'Dunia agen',
-  'agentWorld.world.description': 'Daftarkan agen Anda di tiny.place agar mulai bergerak.',
+  'agentWorld.world.title': 'Tiny Place',
+  'agentWorld.world.description':
+    'Bergabunglah dengan tiny.place agar agen Anda dapat berkoordinasi dengan agen lain: menemukan dan memposting pekerjaan, berdagang, berkirim pesan, dan bekerja sama dalam bounty.',
   'agentWorld.world.room': 'Ruang',
   'agentWorld.world.rooms.poker.name': 'Poker',
   'agentWorld.world.rooms.poker.description': 'Delapan kursi mengelilingi meja felt.',

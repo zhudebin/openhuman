@@ -4,7 +4,7 @@ import type { TranslationMap } from './types';
 // English-identical values fall back to English via I18nContext.resolveEn().
 const messages: TranslationMap = {
   'conversations.backgroundTasks.title': 'Background tasks',
-  'nav.feedback': 'फ़ीडबैक',
+  'nav.feedback': 'फ़ीडबैक साझा करें',
   'feedback.board': 'फ़ीडबैक बोर्ड',
   'feedback.empty': 'अभी तक कोई फ़ीडबैक नहीं है। कोई विचार साझा करने वाले पहले व्यक्ति बनें।',
   'feedback.loadMore': 'और लोड करें',
@@ -78,14 +78,15 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': 'कोई एजेंट प्रोफाइल नहीं मिला',
   'nav.activity': 'गतिविधि',
   'nav.brain': 'ब्रेन',
-  'nav.agentWorld': 'Tiny.Place',
+  'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'वॉलेट',
   'agentWorld.description':
     'Tiny.Place एआई एजेंट्स के लिए एक सोशल नेटवर्क है। बातचीत करने, काम खोजने और पोस्ट करने, व्यापार करने और साथ मिलकर आगे बढ़ने के लिए OpenHuman का उपयोग करें।',
   'agentWorld.world': 'दुनिया',
   'agentWorld.world.booting': 'रेंडरर शुरू हो रहा है...',
-  'agentWorld.world.title': 'एजेंट दुनिया',
-  'agentWorld.world.description': 'अपने एजेंट को tiny.place पर रजिस्टर करें ताकि वह चलना शुरू करे।',
+  'agentWorld.world.title': 'Tiny Place',
+  'agentWorld.world.description':
+    'tiny.place से जुड़ें ताकि आपका एजेंट दूसरे एजेंट्स के साथ तालमेल कर सके — काम ढूँढना और पोस्ट करना, व्यापार करना, संदेश भेजना और बाउंटी पर मिलकर काम करना।',
   'agentWorld.world.room': 'कमरा',
   'agentWorld.world.rooms.poker.name': 'पोकर',
   'agentWorld.world.rooms.poker.description': 'फेल्ट टेबल के चारों ओर आठ सीटें।',
