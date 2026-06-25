@@ -882,6 +882,8 @@ const messages: TranslationMap = {
   'channels.status.error': '错误',
   'channels.status.configuring': '配置中',
   'channels.defaultMessaging': '默认消息渠道',
+  'channels.setAsDefault': '设为默认',
+  'channels.defaultBadge': '默认',
   'webhooks.title': 'Webhook',
   'webhooks.create': '创建 Webhook',
   'webhooks.noWebhooks': '未配置任何 Webhook',

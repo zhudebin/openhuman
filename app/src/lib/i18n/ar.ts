@@ -903,6 +903,8 @@ const messages: TranslationMap = {
   'channels.status.error': 'خطأ',
   'channels.status.configuring': 'جارٍ الضبط',
   'channels.defaultMessaging': 'قناة المراسلة الافتراضية',
+  'channels.setAsDefault': 'تعيين كافتراضي',
+  'channels.defaultBadge': 'افتراضي',
   'webhooks.title': 'الـ Webhooks',
   'webhooks.create': 'إنشاء Webhook',
   'webhooks.noWebhooks': 'لا توجد Webhooks مضبوطة',

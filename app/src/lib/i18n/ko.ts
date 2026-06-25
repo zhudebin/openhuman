@@ -922,6 +922,8 @@ const messages: TranslationMap = {
   'channels.status.error': '오류',
   'channels.status.configuring': '구성 중',
   'channels.defaultMessaging': '기본 메시징 채널',
+  'channels.setAsDefault': '기본값으로 설정',
+  'channels.defaultBadge': '기본값',
   'webhooks.title': '웹훅',
   'webhooks.create': '웹훅 생성',
   'webhooks.noWebhooks': '구성된 웹훅이 없습니다',

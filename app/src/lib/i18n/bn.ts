@@ -926,6 +926,8 @@ const messages: TranslationMap = {
   'channels.status.error': 'ত্রুটি',
   'channels.status.configuring': 'কনফিগার হচ্ছে',
   'channels.defaultMessaging': 'ডিফল্ট মেসেজিং চ্যানেল',
+  'channels.setAsDefault': 'ডিফল্ট হিসেবে সেট করুন',
+  'channels.defaultBadge': 'ডিফল্ট',
   'webhooks.title': 'ওয়েবহুক',
   'webhooks.create': 'Webhook তৈরি করুন',
   'webhooks.noWebhooks': 'কোনো webhook কনফিগার করা হয়নি',

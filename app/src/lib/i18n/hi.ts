@@ -922,6 +922,8 @@ const messages: TranslationMap = {
   'channels.status.error': 'एरर',
   'channels.status.configuring': 'कॉन्फिगर हो रहा है',
   'channels.defaultMessaging': 'डिफ़ॉल्ट मैसेजिंग चैनल',
+  'channels.setAsDefault': 'डिफ़ॉल्ट के रूप में सेट करें',
+  'channels.defaultBadge': 'डिफ़ॉल्ट',
   'webhooks.title': 'वेबहुक्स',
   'webhooks.create': 'Webhook बनाएं',
   'webhooks.noWebhooks': 'कोई webhook कॉन्फिगर नहीं है',

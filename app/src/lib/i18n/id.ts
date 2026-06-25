@@ -929,6 +929,8 @@ const messages: TranslationMap = {
   'channels.status.error': 'Kesalahan',
   'channels.status.configuring': 'Mengonfigurasi',
   'channels.defaultMessaging': 'Kanal Pesan Default',
+  'channels.setAsDefault': 'Jadikan bawaan',
+  'channels.defaultBadge': 'Bawaan',
   'webhooks.title': 'Webhook',
   'webhooks.create': 'Buat Webhook',
   'webhooks.noWebhooks': 'Belum ada webhook yang dikonfigurasi',

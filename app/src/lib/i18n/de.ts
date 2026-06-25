@@ -949,6 +949,8 @@ const messages: TranslationMap = {
   'channels.status.error': 'Fehler',
   'channels.status.configuring': 'Konfigurieren',
   'channels.defaultMessaging': 'Standard-Messaging-Kanal',
+  'channels.setAsDefault': 'Als Standard festlegen',
+  'channels.defaultBadge': 'Standard',
   'webhooks.title': 'Webhooks',
   'webhooks.create': 'Erstelle einen Webhook',
   'webhooks.noWebhooks': 'Keine Webhooks konfiguriert',

@@ -1259,6 +1259,8 @@ const en: TranslationMap = {
   'channels.status.error': 'Error',
   'channels.status.configuring': 'Configuring',
   'channels.defaultMessaging': 'Default Messaging Channel',
+  'channels.setAsDefault': 'Set as default',
+  'channels.defaultBadge': 'Default',
 
   // Webhooks
   'webhooks.title': 'Webhooks',

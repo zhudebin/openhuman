@@ -933,6 +933,8 @@ const messages: TranslationMap = {
   'channels.status.error': 'Ошибка',
   'channels.status.configuring': 'Настройка',
   'channels.defaultMessaging': 'Канал по умолчанию',
+  'channels.setAsDefault': 'Сделать по умолчанию',
+  'channels.defaultBadge': 'По умолчанию',
   'webhooks.title': 'Вебхуки',
   'webhooks.create': 'Создать вебхук',
   'webhooks.noWebhooks': 'Вебхуки не настроены',
