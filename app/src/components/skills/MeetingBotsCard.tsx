@@ -1,3 +1,4 @@
+import debug from 'debug';
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { type MascotFace, RiveMascot } from '../../features/human/Mascot';
@@ -34,6 +35,8 @@ import Button from '../ui/Button';
 import { RecentCallsSection } from './RecentCallsSection';
 
 type Toast = { type: 'success' | 'error' | 'info'; title: string; message?: string };
+
+const log = debug('meeting-bots');
 
 interface Props {
   onToast?: (toast: Toast) => void;
@@ -252,6 +255,7 @@ function MeetingBotsInline({ onToast, hasSubmittedRef }: MeetingBotsInlineProps)
     mascotColor === 'custom'
       ? { primaryColor: customPrimaryColor, secondaryColor: customSecondaryColor }
       : undefined;
+  const wakePhrase = listenOnly ? undefined : `Hey ${agentName}`;
 
   // Success ('active') is handled by the parent MeetingBotsCard, which stays
   // mounted across the inline→active view swap. The error path lives here
@@ -280,6 +284,13 @@ function MeetingBotsInline({ onToast, hasSubmittedRef }: MeetingBotsInlineProps)
     hasSubmittedRef.current = true;
     try {
       const meetingId = crypto.randomUUID();
+      log('join submit %o', {
+        active: !listenOnly,
+        agentChars: agentName.length,
+        ownerChars: respondTo.trim().length,
+        wakeChars: wakePhrase?.length ?? 0,
+        correlationId: meetingId,
+      });
       dispatch(setBackendMeetJoining({ meetUrl: meetUrl.trim(), meetingId, listenOnly }));
       await joinMeetViaBackendBot({
         meetUrl,
@@ -291,6 +302,7 @@ function MeetingBotsInline({ onToast, hasSubmittedRef }: MeetingBotsInlineProps)
         riveColors,
         correlationId: meetingId,
         respondToParticipant: respondTo.trim() || undefined,
+        wakePhrase,
         listenOnly,
       });
     } catch (err) {
