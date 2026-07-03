@@ -25,6 +25,7 @@ const en: TranslationMap = {
   'nav.noAgentProfiles': 'No agent profiles found',
   'nav.activity': 'Activity',
   'nav.brain': 'Brain',
+  'nav.flows': 'Workflows',
   'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'Wallet',
   // Agent World section sub-navigation labels
@@ -4285,6 +4286,33 @@ const en: TranslationMap = {
   'flowRuns.status.completed': 'Completed',
   'flowRuns.status.pending_approval': 'Awaiting approval',
   'flowRuns.status.failed': 'Failed',
+
+  // ── Workflows list page + nav tab (B5a) — the `flows::` domain's
+  // discoverable hub at /flows. Distinct from the legacy SKILL.md
+  // "workflows.*" namespace above and from B3b's "flowRuns.*" / B4's
+  // "chat.flowProposal.*" namespaces (kept apart here to avoid merge
+  // conflicts with those in-flight branches).
+  'flows.page.title': 'Workflows',
+  'flows.page.description': 'Saved automations you can enable, run, and monitor.',
+  'flows.page.emptyTitle': 'No workflows yet',
+  'flows.page.emptyDescription':
+    'Saved workflows will show up here once you create one from the canvas.',
+  'flows.page.loading': 'Loading workflows…',
+  'flows.page.loadError': 'Could not load workflows. Please try again.',
+  'flows.list.lastRun': 'Last run',
+  'flows.list.neverRun': 'Never run',
+  'flows.list.justNow': 'Just now',
+  'flows.list.minutesAgo': '{count}m ago',
+  'flows.list.hoursAgo': '{count}h ago',
+  'flows.list.daysAgo': '{count}d ago',
+  'flows.list.runNow': 'Run',
+  'flows.list.running': 'Running…',
+  'flows.list.viewRuns': 'View runs',
+  'flows.list.toggleEnabled': 'Enable workflow',
+  'flows.list.enabled': 'Enabled',
+  'flows.list.paused': 'Paused',
+  'flows.list.runStarted': 'Workflow started',
+
   'oauth.button.connecting': 'Connecting...',
   'oauth.button.loopbackTimeout':
     'Sign-in timed out — the browser did not complete the OAuth redirect. Please try again.',

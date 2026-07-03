@@ -171,6 +171,7 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': 'No se encontraron perfiles de agente',
   'nav.activity': 'Actividad',
   'nav.brain': 'Cerebro',
+  'nav.flows': 'Flujos de trabajo',
   'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'Cartera',
   'agentWorld.description':
@@ -3709,6 +3710,29 @@ const messages: TranslationMap = {
   'flowRuns.status.completed': 'Completado',
   'flowRuns.status.pending_approval': 'Esperando aprobación',
   'flowRuns.status.failed': 'Fallido',
+
+  'flows.page.title': 'Flujos de trabajo',
+  'flows.page.description':
+    'Automatizaciones guardadas que puedes habilitar, ejecutar y supervisar.',
+  'flows.page.emptyTitle': 'Aún no hay flujos de trabajo',
+  'flows.page.emptyDescription':
+    'Los flujos de trabajo guardados aparecerán aquí en cuanto crees uno desde el lienzo.',
+  'flows.page.loading': 'Cargando flujos de trabajo…',
+  'flows.page.loadError': 'No se pudieron cargar los flujos de trabajo. Inténtalo de nuevo.',
+  'flows.list.lastRun': 'Última ejecución',
+  'flows.list.neverRun': 'Nunca ejecutado',
+  'flows.list.justNow': 'Justo ahora',
+  'flows.list.minutesAgo': 'hace {count} min',
+  'flows.list.hoursAgo': 'hace {count} h',
+  'flows.list.daysAgo': 'hace {count} d',
+  'flows.list.runNow': 'Ejecutar',
+  'flows.list.running': 'Ejecutando…',
+  'flows.list.viewRuns': 'Ver ejecuciones',
+  'flows.list.toggleEnabled': 'Habilitar flujo de trabajo',
+  'flows.list.enabled': 'Habilitado',
+  'flows.list.paused': 'Pausado',
+  'flows.list.runStarted': 'Flujo de trabajo iniciado',
+
   'oauth.button.connecting': 'Conectando...',
   'oauth.button.loopbackTimeout':
     'El inicio de sesión expiró — el navegador no completó la redirección OAuth. Por favor, inténtalo de nuevo.',

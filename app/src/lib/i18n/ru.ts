@@ -173,6 +173,7 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': 'Профили агентов не найдены',
   'nav.activity': 'Активность',
   'nav.brain': 'Мозг',
+  'nav.flows': 'Рабочие процессы',
   'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'Кошелёк',
   'agentWorld.description':
@@ -3679,6 +3680,29 @@ const messages: TranslationMap = {
   'flowRuns.status.completed': 'Завершено',
   'flowRuns.status.pending_approval': 'Ожидает подтверждения',
   'flowRuns.status.failed': 'Не удалось',
+
+  'flows.page.title': 'Рабочие процессы',
+  'flows.page.description':
+    'Сохранённые автоматизации, которые можно включать, запускать и отслеживать.',
+  'flows.page.emptyTitle': 'Пока нет рабочих процессов',
+  'flows.page.emptyDescription':
+    'Сохранённые рабочие процессы появятся здесь, как только вы создадите один на холсте.',
+  'flows.page.loading': 'Загрузка рабочих процессов…',
+  'flows.page.loadError': 'Не удалось загрузить рабочие процессы. Попробуйте снова.',
+  'flows.list.lastRun': 'Последний запуск',
+  'flows.list.neverRun': 'Ещё не запускался',
+  'flows.list.justNow': 'Только что',
+  'flows.list.minutesAgo': '{count} мин назад',
+  'flows.list.hoursAgo': '{count} ч назад',
+  'flows.list.daysAgo': '{count} дн назад',
+  'flows.list.runNow': 'Запустить',
+  'flows.list.running': 'Выполняется…',
+  'flows.list.viewRuns': 'Просмотреть запуски',
+  'flows.list.toggleEnabled': 'Включить рабочий процесс',
+  'flows.list.enabled': 'Включён',
+  'flows.list.paused': 'Приостановлен',
+  'flows.list.runStarted': 'Рабочий процесс запущен',
+
   'oauth.button.connecting': 'Подключение...',
   'oauth.button.loopbackTimeout':
     'Время входа истекло — браузер не завершил перенаправление OAuth. Пожалуйста, попробуйте снова.',

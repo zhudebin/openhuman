@@ -169,6 +169,7 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': 'কোনো এজেন্ট প্রোফাইল পাওয়া যায়নি',
   'nav.activity': 'কার্যকলাপ',
   'nav.brain': 'ব্রেইন',
+  'nav.flows': 'ওয়ার্কফ্লো',
   'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'ওয়ালেট',
   'agentWorld.description':
@@ -3646,6 +3647,28 @@ const messages: TranslationMap = {
   'flowRuns.status.completed': 'সম্পন্ন',
   'flowRuns.status.pending_approval': 'অনুমোদনের অপেক্ষায়',
   'flowRuns.status.failed': 'ব্যর্থ',
+
+  'flows.page.title': 'ওয়ার্কফ্লো',
+  'flows.page.description': 'সংরক্ষিত অটোমেশন যা আপনি সক্ষম, চালাতে এবং পর্যবেক্ষণ করতে পারেন।',
+  'flows.page.emptyTitle': 'এখনো কোনো ওয়ার্কফ্লো নেই',
+  'flows.page.emptyDescription':
+    'ক্যানভাস থেকে একটি তৈরি করলে সংরক্ষিত ওয়ার্কফ্লোগুলো এখানে দেখা যাবে।',
+  'flows.page.loading': 'ওয়ার্কফ্লো লোড হচ্ছে…',
+  'flows.page.loadError': 'ওয়ার্কফ্লো লোড করা যায়নি। আবার চেষ্টা করুন।',
+  'flows.list.lastRun': 'সর্বশেষ চালানো',
+  'flows.list.neverRun': 'কখনো চালানো হয়নি',
+  'flows.list.justNow': 'এইমাত্র',
+  'flows.list.minutesAgo': '{count} মিনিট আগে',
+  'flows.list.hoursAgo': '{count} ঘণ্টা আগে',
+  'flows.list.daysAgo': '{count} দিন আগে',
+  'flows.list.runNow': 'চালান',
+  'flows.list.running': 'চলছে…',
+  'flows.list.viewRuns': 'রান দেখুন',
+  'flows.list.toggleEnabled': 'ওয়ার্কফ্লো সক্ষম করুন',
+  'flows.list.enabled': 'সক্ষম',
+  'flows.list.paused': 'বিরতি দেওয়া',
+  'flows.list.runStarted': 'ওয়ার্কফ্লো শুরু হয়েছে',
+
   'oauth.button.connecting': 'সংযোগ হচ্ছে...',
   'oauth.button.loopbackTimeout':
     'সাইন-ইন টাইম আউট হয়েছে — ব্রাউজার OAuth পুনর্নির্দেশনা সম্পন্ন করেনি। অনুগ্রহ করে আবার চেষ্টা করুন।',

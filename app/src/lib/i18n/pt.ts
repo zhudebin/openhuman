@@ -170,6 +170,7 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': 'Nenhum perfil de agente encontrado',
   'nav.activity': 'Atividade',
   'nav.brain': 'Cérebro',
+  'nav.flows': 'Fluxos de trabalho',
   'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'Carteira',
   'agentWorld.description':
@@ -3705,6 +3706,28 @@ const messages: TranslationMap = {
   'flowRuns.status.completed': 'Concluído',
   'flowRuns.status.pending_approval': 'Aguardando aprovação',
   'flowRuns.status.failed': 'Falhou',
+
+  'flows.page.title': 'Fluxos de trabalho',
+  'flows.page.description': 'Automações salvas que você pode habilitar, executar e monitorar.',
+  'flows.page.emptyTitle': 'Ainda não há fluxos de trabalho',
+  'flows.page.emptyDescription':
+    'Os fluxos de trabalho salvos aparecerão aqui assim que você criar um a partir do canvas.',
+  'flows.page.loading': 'Carregando fluxos de trabalho…',
+  'flows.page.loadError': 'Não foi possível carregar os fluxos de trabalho. Tente novamente.',
+  'flows.list.lastRun': 'Última execução',
+  'flows.list.neverRun': 'Nunca executado',
+  'flows.list.justNow': 'Agora mesmo',
+  'flows.list.minutesAgo': 'há {count} min',
+  'flows.list.hoursAgo': 'há {count} h',
+  'flows.list.daysAgo': 'há {count} d',
+  'flows.list.runNow': 'Executar',
+  'flows.list.running': 'Executando…',
+  'flows.list.viewRuns': 'Ver execuções',
+  'flows.list.toggleEnabled': 'Habilitar fluxo de trabalho',
+  'flows.list.enabled': 'Habilitado',
+  'flows.list.paused': 'Pausado',
+  'flows.list.runStarted': 'Fluxo de trabalho iniciado',
+
   'oauth.button.connecting': 'Conectando...',
   'oauth.button.loopbackTimeout':
     'Login expirou — o navegador não concluiu o redirecionamento OAuth. Por favor, tente novamente.',

@@ -169,6 +169,7 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': 'Profil agen tidak ditemukan',
   'nav.activity': 'Aktivitas',
   'nav.brain': 'Otak',
+  'nav.flows': 'Alur Kerja',
   'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'Dompet',
   'agentWorld.description':
@@ -3654,6 +3655,28 @@ const messages: TranslationMap = {
   'flowRuns.status.completed': 'Selesai',
   'flowRuns.status.pending_approval': 'Menunggu persetujuan',
   'flowRuns.status.failed': 'Gagal',
+
+  'flows.page.title': 'Alur Kerja',
+  'flows.page.description': 'Otomatisasi tersimpan yang dapat Anda aktifkan, jalankan, dan pantau.',
+  'flows.page.emptyTitle': 'Belum ada alur kerja',
+  'flows.page.emptyDescription':
+    'Alur kerja tersimpan akan muncul di sini setelah Anda membuat satu dari kanvas.',
+  'flows.page.loading': 'Memuat alur kerja…',
+  'flows.page.loadError': 'Alur kerja gagal dimuat. Silakan coba lagi.',
+  'flows.list.lastRun': 'Terakhir dijalankan',
+  'flows.list.neverRun': 'Belum pernah dijalankan',
+  'flows.list.justNow': 'Baru saja',
+  'flows.list.minutesAgo': '{count} menit lalu',
+  'flows.list.hoursAgo': '{count} jam lalu',
+  'flows.list.daysAgo': '{count} hari lalu',
+  'flows.list.runNow': 'Jalankan',
+  'flows.list.running': 'Sedang berjalan…',
+  'flows.list.viewRuns': 'Lihat riwayat',
+  'flows.list.toggleEnabled': 'Aktifkan alur kerja',
+  'flows.list.enabled': 'Aktif',
+  'flows.list.paused': 'Dijeda',
+  'flows.list.runStarted': 'Alur kerja dimulai',
+
   'oauth.button.connecting': 'Menghubungkan...',
   'oauth.button.loopbackTimeout':
     'Masuk habis waktu — browser tidak menyelesaikan pengalihan OAuth. Silakan coba lagi.',

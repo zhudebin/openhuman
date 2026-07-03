@@ -171,6 +171,7 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': "Aucun profil d'agent trouvé",
   'nav.activity': 'Activité',
   'nav.brain': 'Cerveau',
+  'nav.flows': 'Workflows',
   'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'Portefeuille',
   'agentWorld.description':
@@ -3724,6 +3725,29 @@ const messages: TranslationMap = {
   'flowRuns.status.completed': 'Terminé',
   'flowRuns.status.pending_approval': "En attente d'approbation",
   'flowRuns.status.failed': 'Échoué',
+
+  'flows.page.title': 'Workflows',
+  'flows.page.description':
+    'Automatisations enregistrées que vous pouvez activer, exécuter et surveiller.',
+  'flows.page.emptyTitle': "Aucun workflow pour l'instant",
+  'flows.page.emptyDescription':
+    'Les workflows enregistrés apparaîtront ici dès que vous en créerez un depuis le canevas.',
+  'flows.page.loading': 'Chargement des workflows…',
+  'flows.page.loadError': 'Impossible de charger les workflows. Veuillez réessayer.',
+  'flows.list.lastRun': 'Dernière exécution',
+  'flows.list.neverRun': 'Jamais exécuté',
+  'flows.list.justNow': "À l'instant",
+  'flows.list.minutesAgo': 'il y a {count} min',
+  'flows.list.hoursAgo': 'il y a {count} h',
+  'flows.list.daysAgo': 'il y a {count} j',
+  'flows.list.runNow': 'Exécuter',
+  'flows.list.running': 'Exécution…',
+  'flows.list.viewRuns': 'Voir les exécutions',
+  'flows.list.toggleEnabled': 'Activer le workflow',
+  'flows.list.enabled': 'Activé',
+  'flows.list.paused': 'En pause',
+  'flows.list.runStarted': 'Workflow démarré',
+
   'oauth.button.connecting': 'Connexion en cours…',
   'oauth.button.loopbackTimeout':
     "La connexion a expiré — le navigateur n'a pas complété la redirection OAuth. Veuillez réessayer.",

@@ -173,6 +173,7 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': 'Nie znaleziono profili agentów',
   'nav.activity': 'Aktywność',
   'nav.brain': 'Mózg',
+  'nav.flows': 'Przepływy pracy',
   'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'Portfel',
   'agentWorld.description':
@@ -3690,6 +3691,29 @@ const messages: TranslationMap = {
   'flowRuns.status.completed': 'Zakończono',
   'flowRuns.status.pending_approval': 'Oczekuje na zatwierdzenie',
   'flowRuns.status.failed': 'Niepowodzenie',
+
+  'flows.page.title': 'Przepływy pracy',
+  'flows.page.description':
+    'Zapisane automatyzacje, które możesz włączyć, uruchomić i monitorować.',
+  'flows.page.emptyTitle': 'Brak przepływów pracy',
+  'flows.page.emptyDescription':
+    'Zapisane przepływy pracy pojawią się tutaj, gdy utworzysz jeden na płótnie.',
+  'flows.page.loading': 'Ładowanie przepływów pracy…',
+  'flows.page.loadError': 'Nie udało się załadować przepływów pracy. Spróbuj ponownie.',
+  'flows.list.lastRun': 'Ostatnie uruchomienie',
+  'flows.list.neverRun': 'Nigdy nie uruchomiono',
+  'flows.list.justNow': 'Przed chwilą',
+  'flows.list.minutesAgo': '{count} min temu',
+  'flows.list.hoursAgo': '{count} godz. temu',
+  'flows.list.daysAgo': '{count} dni temu',
+  'flows.list.runNow': 'Uruchom',
+  'flows.list.running': 'Uruchamianie…',
+  'flows.list.viewRuns': 'Zobacz uruchomienia',
+  'flows.list.toggleEnabled': 'Włącz przepływ pracy',
+  'flows.list.enabled': 'Włączony',
+  'flows.list.paused': 'Wstrzymany',
+  'flows.list.runStarted': 'Przepływ pracy uruchomiony',
+
   'oauth.button.connecting': 'Łączenie...',
   'oauth.button.loopbackTimeout':
     'Logowanie przekroczyło limit czasu — przeglądarka nie ukończyła przekierowania OAuth. Spróbuj ponownie.',

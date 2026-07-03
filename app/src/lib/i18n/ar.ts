@@ -164,6 +164,7 @@ const messages: TranslationMap = {
   'nav.noAgentProfiles': 'لم يتم العثور على ملفات وكلاء',
   'nav.activity': 'النشاط',
   'nav.brain': 'الدماغ',
+  'nav.flows': 'سير العمل',
   'nav.agentWorld': 'Tiny Place',
   'nav.wallet': 'المحفظة',
   'agentWorld.description':
@@ -3565,6 +3566,28 @@ const messages: TranslationMap = {
   'flowRuns.status.completed': 'مكتمل',
   'flowRuns.status.pending_approval': 'بانتظار الموافقة',
   'flowRuns.status.failed': 'فشل',
+
+  'flows.page.title': 'سير العمل',
+  'flows.page.description': 'أتمتة محفوظة يمكنك تفعيلها وتشغيلها ومتابعتها.',
+  'flows.page.emptyTitle': 'لا توجد عمليات سير عمل بعد',
+  'flows.page.emptyDescription':
+    'ستظهر عمليات سير العمل المحفوظة هنا بمجرد إنشاء واحدة من لوحة الرسم.',
+  'flows.page.loading': 'جارٍ تحميل عمليات سير العمل…',
+  'flows.page.loadError': 'تعذر تحميل عمليات سير العمل. يرجى المحاولة مرة أخرى.',
+  'flows.list.lastRun': 'آخر تشغيل',
+  'flows.list.neverRun': 'لم يتم التشغيل بعد',
+  'flows.list.justNow': 'الآن',
+  'flows.list.minutesAgo': 'منذ {count} دقيقة',
+  'flows.list.hoursAgo': 'منذ {count} ساعة',
+  'flows.list.daysAgo': 'منذ {count} يوم',
+  'flows.list.runNow': 'تشغيل',
+  'flows.list.running': 'جارٍ التشغيل…',
+  'flows.list.viewRuns': 'عرض التشغيلات',
+  'flows.list.toggleEnabled': 'تفعيل سير العمل',
+  'flows.list.enabled': 'مفعّل',
+  'flows.list.paused': 'متوقف مؤقتًا',
+  'flows.list.runStarted': 'بدأ تشغيل سير العمل',
+
   'oauth.button.connecting': 'جارٍ الاتصال...',
   'oauth.button.loopbackTimeout':
     'انتهت مهلة تسجيل الدخول — لم يكتمل المتصفح إعادة توجيه OAuth. يرجى المحاولة مرة أخرى.',
