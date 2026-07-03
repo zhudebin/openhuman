@@ -25,17 +25,103 @@
 //! It mirrors the original seams: child progress deltas (`Subagent*` events incl.
 //! thinking), mid-flight steering, the `ask_user_clarification` early-exit pause,
 //! and a graceful model-call-cap checkpoint summary
-//! (`SubagentCheckpoint::on_max_iter`).
+//! (`SubagentCheckpoint::summarize_cap_hit`).
 
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use super::usage::AggregatedUsage;
+use crate::openhuman::agent::harness::agent_graph::{
+    AgentTurnRequest, AgentTurnResult, AgentTurnUsage,
+};
 use crate::openhuman::agent::harness::subagent_runner::types::SubagentRunError;
 use crate::openhuman::agent::progress::AgentProgress;
 use crate::openhuman::inference::provider::{ChatMessage, ConversationMessage, Provider};
 use crate::openhuman::tinyagents::{run_turn_via_tinyagents_shared, SubagentScope};
 use crate::openhuman::tools::{Tool, ToolSpec};
+use tinyagents::harness::workspace::WorkspaceDescriptor;
+
+/// Cumulative usage stats gathered across a sub-agent graph run.
+#[derive(Debug, Clone, Default)]
+pub(super) struct AggregatedUsage {
+    pub(super) input_tokens: u64,
+    pub(super) output_tokens: u64,
+    pub(super) cached_input_tokens: u64,
+    pub(super) charged_amount_usd: f64,
+}
+
+/// Run an assembled custom per-agent turn through the shared default sub-agent
+/// leaf. Bespoke `AgentGraph::Custom` graphs use this after their own routing
+/// nodes so transcript persistence, worker-thread mirroring, progress events,
+/// handoff middleware, cap summaries, and usage aggregation stay byte-for-byte
+/// on the default path.
+pub(crate) async fn run_agent_turn_request_via_default_graph(
+    req: AgentTurnRequest,
+) -> Result<AgentTurnResult, SubagentRunError> {
+    let AgentTurnRequest {
+        provider,
+        model,
+        temperature,
+        mut history,
+        parent_tools,
+        dynamic_tools,
+        specs,
+        allowed_names,
+        max_iterations,
+        run_queue,
+        on_progress,
+        agent_id,
+        task_id,
+        extended_policy,
+        worker_thread_id,
+        workspace_dir,
+        workspace_descriptor,
+        max_output_tokens,
+        model_vision,
+        transcript_stem,
+        provider_label,
+        handoff_cache,
+    } = req;
+
+    let (output, iterations, usage, early_exit_tool, hit_cap) = run_subagent_via_graph(
+        provider,
+        &model,
+        temperature,
+        &mut history,
+        parent_tools,
+        dynamic_tools,
+        specs,
+        allowed_names,
+        max_iterations,
+        run_queue,
+        on_progress,
+        &agent_id,
+        &task_id,
+        extended_policy,
+        worker_thread_id,
+        workspace_dir,
+        workspace_descriptor,
+        max_output_tokens,
+        model_vision,
+        &transcript_stem,
+        &provider_label,
+        handoff_cache,
+    )
+    .await?;
+
+    Ok(AgentTurnResult {
+        history,
+        output,
+        iterations,
+        usage: AgentTurnUsage {
+            input_tokens: usage.input_tokens,
+            output_tokens: usage.output_tokens,
+            cached_input_tokens: usage.cached_input_tokens,
+            charged_amount_usd: usage.charged_amount_usd,
+        },
+        early_exit_tool,
+        hit_cap,
+    })
+}
 
 /// Drive a sub-agent turn on the tinyagents harness. Returns
 /// `(text, model_calls, AggregatedUsage, early_exit_tool, hit_cap)` — `hit_cap`
@@ -59,6 +145,7 @@ pub(super) async fn run_subagent_via_graph(
     extended_policy: bool,
     worker_thread_id: Option<String>,
     workspace_dir: std::path::PathBuf,
+    workspace_descriptor: Option<WorkspaceDescriptor>,
     max_output_tokens: u32,
     model_vision: bool,
     // Transcript-persistence provenance: the resolved child transcript stem
@@ -157,7 +244,7 @@ pub(super) async fn run_subagent_via_graph(
         // Pause + checkpoint when the child asks the user a clarifying question.
         &["ask_user_clarification"],
         // Pause gracefully at the model-call cap so we can summarize a resumable
-        // checkpoint (below) instead of erroring — legacy `on_max_iter` parity.
+        // checkpoint (below) instead of erroring — legacy cap-summary parity.
         true,
         // Bound the sub-agent's per-call output at its configured budget.
         Some(max_output_tokens),
@@ -178,9 +265,14 @@ pub(super) async fn run_subagent_via_graph(
         // Sub-agents gate via their own SubagentToolSource policy path, not the
         // session `.tool_policy()`; no enforcement threaded here.
         None,
+        // Isolated worker descriptor, when worktree isolation prepared one.
+        workspace_descriptor,
+        // Sub-agent turns run tools with external effects; not a deterministic
+        // internal run, so response caching stays off (safe default).
+        false,
     ))
     .await
-    .map_err(SubagentRunError::Provider)?;
+    .map_err(map_tinyagents_subagent_error)?;
 
     // Write the final conversation back so the caller can checkpoint / persist.
     // Keep the original (un-expanded) prior turns and append only this turn's typed
@@ -215,7 +307,6 @@ pub(super) async fn run_subagent_via_graph(
     // checkpoint (the delegating agent continues from partial progress) rather
     // than surfacing an empty/partial answer — the legacy `SubagentCheckpoint`.
     if outcome.hit_cap {
-        use super::super::super::engine::CheckpointStrategy;
         let digest = build_cap_digest(&outcome.conversation);
         let strategy = super::checkpoint::SubagentCheckpoint {
             provider: summary_provider.as_ref(),
@@ -226,7 +317,7 @@ pub(super) async fn run_subagent_via_graph(
             // budget (the value this field replaced when it was hardcoded).
             max_output_tokens: crate::openhuman::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS,
         };
-        match strategy.on_max_iter(&digest, max_iterations).await {
+        match strategy.summarize_cap_hit(&digest, max_iterations).await {
             Ok(co) => {
                 if let Some(u) = co.usage {
                     usage.input_tokens += u.input_tokens;
@@ -308,6 +399,13 @@ pub(super) async fn run_subagent_via_graph(
         outcome.early_exit_tool,
         outcome.hit_cap,
     ))
+}
+
+fn map_tinyagents_subagent_error(err: anyhow::Error) -> SubagentRunError {
+    match err.downcast::<SubagentRunError>() {
+        Ok(run_err) => run_err,
+        Err(err) => SubagentRunError::Provider(err),
+    }
 }
 
 /// Persist a sub-agent turn's raw transcript to `session_raw`, mirroring the
@@ -400,7 +498,7 @@ fn mirror_worker_thread(
         append_message, ConversationMessage as StoredMessage,
     };
 
-    let mut append = |content: String, sender: &str| {
+    let append = |content: String, sender: &str| {
         let message = StoredMessage {
             id: format!("{sender}:{}", uuid::Uuid::new_v4()),
             content,
@@ -579,6 +677,7 @@ mod tests {
             false,
             None,
             std::env::temp_dir(),
+            None,
             1024,
             false,
             "root-session__real_tools",
@@ -666,6 +765,7 @@ mod tests {
             false,
             None,
             std::env::temp_dir(),
+            None,
             1024,
             false,
             "root-session__scoped_deltas",
@@ -811,6 +911,7 @@ mod tests {
             false,
             None,
             std::env::temp_dir(),
+            None,
             1024,
             false,
             "root-session__clarification",
@@ -916,6 +1017,7 @@ mod tests {
             false,
             None,
             std::env::temp_dir(),
+            None,
             1024,
             false,
             "root-session__cap_hit",

@@ -13,7 +13,7 @@
 //! instead of erroring.
 //!
 //! **Available tools.** The agent's resolved harness tool set (`tools`),
-//! advertised via [`SharedToolAdapter`](crate::openhuman::tinyagents::SharedToolAdapter)
+//! advertised via `SharedToolAdapter`
 //! and filtered by `visible_tool_names`. The chat turn surfaces clarifying
 //! questions inline rather than pausing, so it advertises **no early-exit
 //! tools**.
@@ -107,6 +107,11 @@ pub(crate) async fn run_chat_turn_graph(graph: ChatTurnGraph) -> Result<Tinyagen
         graph.context_mw,
         // Builder-configured tool policy enforcement (session chat path).
         graph.tool_policy,
+        // Top-level chat turns do not yet carry SDK workspace descriptors.
+        None,
+        // Interactive chat turn — response caching MUST stay off so a live user
+        // turn is never served a cached model response (correctness/safety).
+        false,
     )
     .await
 }

@@ -10,11 +10,14 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Instant;
 
+use crate::openhuman::agent::harness::agent_graph::{AgentTurnRequest, AgentTurnUsage};
 use crate::openhuman::agent::harness::definition::{
     validate_tier_transition, AgentDefinition, AgentDefinitionRegistry, AgentTier, IterationPolicy,
-    PromptSource,
+    PromptSource, SandboxMode as AgentSandboxMode,
 };
-use crate::openhuman::agent::harness::fork_context::{current_parent, ParentExecutionContext};
+use crate::openhuman::agent::harness::fork_context::{
+    current_parent, with_parent_context, ParentExecutionContext,
+};
 use crate::openhuman::agent::harness::subagent_runner::extract_tool::ExtractFromResultTool;
 use crate::openhuman::agent::harness::subagent_runner::handoff::ResultHandoffCache;
 use crate::openhuman::agent::harness::subagent_runner::tool_prep::{
@@ -33,6 +36,8 @@ use crate::openhuman::context::prompt::{
 use crate::openhuman::file_state::with_file_state_agent_id;
 use crate::openhuman::inference::provider::AGENT_TURN_MAX_OUTPUT_TOKENS;
 use crate::openhuman::tools::{Tool, ToolCategory, ToolSpec};
+use tinyagents::harness::tool::SandboxMode as TinyagentsSandboxMode;
+use tinyagents::harness::workspace::WorkspaceDescriptor;
 
 use super::prompt::{append_subagent_role_contract, dedup_tool_specs_by_name};
 use super::provider::{
@@ -61,7 +66,7 @@ use super::provider::{
 /// boot loader walk); a forbidden hop is logged and becomes a
 /// [`SubagentRunError::TierViolation`]. Logging lives here (rather than at the
 /// call site) so the deny path is exercised by this fn's unit tests.
-pub(crate) fn tier_gate_decision(
+pub(super) fn tier_gate_decision(
     parent_def: Option<&AgentDefinition>,
     child: &AgentDefinition,
     parent_agent_id: &str,
@@ -109,16 +114,17 @@ pub async fn run_subagent(
     // Unconditionally heap-allocate the entire run_subagent body so
     // every caller doesn't have to carry this future's state inline.
     // Tools that delegate run inside the parent agent's already-deep
-    // `run_turn_engine` poll, so the parent's stack would otherwise pile
-    // (parent engine state + dispatch_subagent state + run_subagent's
-    // wrapper state + run_typed_mode state + child engine state) onto
-    // tokio's 2 MiB worker stack and abort with "thread
+    // turn poll (the boxed tinyagents harness drive future in
+    // `run_turn_via_tinyagents_shared`), so the parent's stack would
+    // otherwise pile (parent turn state + dispatch_subagent state +
+    // run_subagent's wrapper state + run_typed_mode state + child turn
+    // state) onto tokio's 2 MiB worker stack and abort with "thread
     // 'tokio-rt-worker' has overflowed its stack, fatal runtime error:
     // stack overflow" — observed at `[subagent_runner] dispatching
     // agent_id=researcher ...` in the `chat-harness-subagent` Playwright
-    // lane crash. The inner `Box::pin`s around `run_typed_mode` /
-    // `run_inner_loop` / child `run_turn_engine` further chunk the
-    // child's state so a single sub-agent run can't blow the stack either.
+    // lane crash. The inner `Box::pin`s around `run_typed_mode` and the
+    // child's tinyagents drive future further chunk the child's state so
+    // a single sub-agent run can't blow the stack either.
     Box::pin(async move {
         let parent = current_parent().ok_or(SubagentRunError::NoParentContext)?;
         let task_id = options
@@ -129,6 +135,11 @@ pub async fn run_subagent(
         let current_depth = current_spawn_depth();
         let attempted_depth = current_depth.saturating_add(1);
 
+        // Synchronous pre-dispatch projection of the single depth authority
+        // (`MAX_SPAWN_DEPTH`, also fed to the crate's `RunPolicy.limits.max_depth`).
+        // This surfaces `SpawnDepthExceeded` before a provider round-trip and
+        // across the MCP process hop; the crate's `TinyAgentsError::SubAgentDepth`
+        // maps onto this same error shape for over-deep in-process runs.
         if attempted_depth > MAX_SPAWN_DEPTH {
             tracing::warn!(
                 agent_id = %definition.id,
@@ -168,35 +179,43 @@ pub async fn run_subagent(
         // Install the sub-agent's declared `sandbox_mode` as the active
         // task-local for every tool invocation inside this run.
         //
-        // When the worker opted into git-worktree isolation, also install
-        // its isolated checkout path as the `action_dir` override so acting
-        // tools (shell, git) operate inside that worktree instead of the
-        // shared `Config.action_dir`. When `worktree_action_dir` is `None`
-        // (the default / non-isolated path), no override scope is entered and
-        // behaviour is unchanged.
-        let worktree_action_dir = options.worktree_action_dir.clone();
-        if let Some(ref wt_dir) = worktree_action_dir {
+        // When the worker opted into git-worktree isolation, its isolated
+        // checkout is carried on the `WorkspaceDescriptor` prepared below and
+        // threaded onto the run's tinyagents `RunContext`
+        // (`run_turn_via_tinyagents_shared` → `RunContext::with_workspace`).
+        // Every tool call then receives it via
+        // `ToolExecutionContext::from_run_context`, so acting tools (shell, git)
+        // resolve their CWD to that worktree (`effective_action_dir_for_context`)
+        // instead of the shared `Config.action_dir` — no task-local override
+        // needed. When no descriptor is prepared (the default / non-isolated
+        // path), tools fall through to `security.action_dir` and behaviour is
+        // unchanged.
+        let mut parent_for_subagent = parent.clone();
+        parent_for_subagent.workspace_descriptor =
+            workspace_descriptor_for_subagent(definition, &options, &parent, &task_id);
+        if let Some(descriptor) = parent_for_subagent.workspace_descriptor.as_ref() {
             tracing::debug!(
                 agent_id = %definition.id,
                 task_id = %task_id,
-                worktree = %wt_dir.display(),
-                "[subagent_runner] installing worktree action_dir override"
+                worktree = %descriptor.root.display(),
+                policy_id = %descriptor.policy_id,
+                "[subagent_runner] worktree-isolated worker: descriptor will route acting-tool CWD"
             );
         }
         let mut outcome = with_spawn_depth(attempted_depth, async {
             with_file_state_agent_id(task_id.clone(), async {
                 with_current_sandbox_mode(definition.sandbox_mode, async {
-                    let run = run_typed_mode(definition, task_prompt, &options, &parent, &task_id);
-                    match worktree_action_dir {
-                        Some(wt_dir) => {
-                            crate::openhuman::agent::harness::with_action_dir_override(
-                                wt_dir,
-                                Box::pin(run),
-                            )
-                            .await
-                        }
-                        None => Box::pin(run).await,
-                    }
+                    with_parent_context(parent_for_subagent.clone(), async {
+                        Box::pin(run_typed_mode(
+                            definition,
+                            task_prompt,
+                            &options,
+                            &parent_for_subagent,
+                            &task_id,
+                        ))
+                        .await
+                    })
+                    .await
                 })
                 .await
             })
@@ -243,6 +262,30 @@ pub async fn run_subagent(
     .await
 }
 
+fn workspace_descriptor_for_subagent(
+    definition: &AgentDefinition,
+    options: &SubagentRunOptions,
+    parent: &ParentExecutionContext,
+    task_id: &str,
+) -> Option<WorkspaceDescriptor> {
+    if let Some(descriptor) = options.workspace_descriptor.clone() {
+        return Some(descriptor);
+    }
+    if let Some(descriptor) = parent.workspace_descriptor.clone() {
+        return Some(descriptor);
+    }
+    let root = options.worktree_action_dir.clone()?;
+    let sandbox = match definition.sandbox_mode {
+        AgentSandboxMode::Sandboxed => TinyagentsSandboxMode::Required,
+        AgentSandboxMode::None | AgentSandboxMode::ReadOnly => TinyagentsSandboxMode::Inherit,
+    };
+    Some(
+        WorkspaceDescriptor::new(root)
+            .with_policy_id(format!("openhuman.worktree:{task_id}"))
+            .with_sandbox(sandbox),
+    )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Typed mode — narrow prompt, filtered tools, cheaper model
 // ─────────────────────────────────────────────────────────────────────────────
@@ -260,6 +303,29 @@ async fn run_typed_mode(
     task_id: &str,
 ) -> Result<SubagentRunOutcome, SubagentRunError> {
     let started = Instant::now();
+    match crate::openhuman::tinyagents::subagent_graph::run_subagent_pipeline_skeleton(
+        &definition.id,
+        task_id,
+    )
+    .await
+    {
+        Ok(phases) => {
+            tracing::debug!(
+                agent_id = %definition.id,
+                task_id,
+                phases = ?phases,
+                "[subagent_runner:graph] sub-agent pipeline skeleton completed"
+            );
+        }
+        Err(err) => {
+            tracing::warn!(
+                agent_id = %definition.id,
+                task_id,
+                error = %err,
+                "[subagent_runner:graph] sub-agent pipeline skeleton failed; continuing procedural runner"
+            );
+        }
+    }
 
     // Resolve provider + model. See `resolve_subagent_provider` for the
     // semantics of each ModelSpec variant. `Config::load_or_init()` is
@@ -795,8 +861,7 @@ async fn run_typed_mode(
         if is_integrations_agent_with_toolkit {
             if let Some(sys) = history.iter_mut().find(|m| m.role == "system") {
                 sys.content.push_str("\n\n");
-                sys.content
-                    .push_str(&build_text_mode_tool_instructions(&filtered_specs));
+                sys.content.push_str(&build_text_mode_tool_instructions());
             }
             tracing::info!(
                 agent_id = %definition.id,
@@ -841,10 +906,8 @@ async fn run_typed_mode(
     // graph; `Custom` hands the assembled turn to this agent's own graph runner
     // (declared in its `graph.rs::graph()`). Every built-in agent selects
     // `Default` today — the branch is the extension point.
-    use super::usage::AggregatedUsage;
-    use crate::openhuman::agent::harness::agent_graph::{
-        AgentGraph, AgentTurnRequest, AgentTurnUsage,
-    };
+    use super::graph::AggregatedUsage;
+    use crate::openhuman::agent::harness::agent_graph::AgentGraph;
     // Resolve the child transcript stem once — `{parent_chain}__{child_session_key}`
     // — so the sub-agent's raw transcript lands in `session_raw` under a filename
     // that chains the parent session (parity with the removed observer stem).
@@ -883,6 +946,17 @@ async fn run_typed_mode(
         };
         format!("{parent_chain}__{child_session_key}")
     };
+    let workspace_descriptor =
+        workspace_descriptor_for_subagent(definition, options, parent, task_id);
+    if let Some(descriptor) = &workspace_descriptor {
+        tracing::debug!(
+            agent_id = %definition.id,
+            task_id,
+            root = %descriptor.root.display(),
+            policy_id = %descriptor.policy_id,
+            "[subagent_runner] prepared workspace descriptor for tinyagents run"
+        );
+    }
 
     let (output, iterations, agg_usage, early_exit_tool, hit_cap) = match &definition.graph {
         AgentGraph::Default => {
@@ -903,6 +977,7 @@ async fn run_typed_mode(
                 definition.iteration_policy == IterationPolicy::Extended,
                 options.worker_thread_id.clone(),
                 parent.workspace_dir.clone(),
+                workspace_descriptor.clone(),
                 max_output_tokens,
                 model_vision,
                 &transcript_stem,
@@ -935,8 +1010,12 @@ async fn run_typed_mode(
                 extended_policy: definition.iteration_policy == IterationPolicy::Extended,
                 worker_thread_id: options.worker_thread_id.clone(),
                 workspace_dir: parent.workspace_dir.clone(),
+                workspace_descriptor: workspace_descriptor.clone(),
                 max_output_tokens,
                 model_vision,
+                transcript_stem: transcript_stem.clone(),
+                provider_label: "subagent".to_string(),
+                handoff_cache: handoff_cache.clone(),
             };
             let res = run(req).await?;
             history = res.history;

@@ -19,7 +19,7 @@
 //! [`TurnContextMiddleware`] bundles the config and installs whichever hooks are
 //! enabled onto a harness.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -27,86 +27,210 @@ use async_trait::async_trait;
 
 use tinyagents::error::Result as TaResult;
 use tinyagents::harness::context::RunContext;
+use tinyagents::harness::events::AgentEvent;
 use tinyagents::harness::message::{ContentBlock, Message as TaMessage};
 use tinyagents::harness::middleware::{
-    Middleware, MiddlewareToolOutcome, ToolHandler, ToolMiddleware,
+    ContextualToolSelectionMiddleware, Middleware, MiddlewareToolOutcome, ToolAllowlistMiddleware,
+    ToolHandler, ToolMiddleware,
 };
-use tinyagents::harness::model::ModelRequest;
+use tinyagents::harness::model::{ModelRequest, PromptSegment, SegmentRole};
 use tinyagents::harness::runtime::AgentHarness;
 use tinyagents::harness::steering::{SteeringCommand, SteeringHandle};
-use tinyagents::harness::tool::{ToolCall as TaToolCall, ToolResult as TaToolResult};
+use tinyagents::harness::tool::{
+    ToolCall as TaToolCall, ToolPolicy as TaToolPolicy, ToolResult as TaToolResult, ToolSchema,
+};
 
-use super::tools::UNKNOWN_TOOL_SENTINEL;
-use crate::openhuman::agent::harness::payload_summarizer::PayloadSummarizer;
+use crate::openhuman::agent::harness::tool_result_artifacts::{
+    apply_per_result_persistence, ToolResultArtifactStore, TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE,
+};
 use crate::openhuman::approval::{
     redact_args, summarize_action, ApprovalGate, ExecutionOutcome, GateOutcome,
 };
-use crate::openhuman::context::tool_result_budget::apply_tool_result_budget;
 use crate::openhuman::context::CLEARED_PLACEHOLDER;
+use crate::openhuman::tinyagents::payload_summarizer::PayloadSummarizer;
+use crate::openhuman::tokenjuice::AgentTokenjuiceCompression;
 use crate::openhuman::tools::Tool;
 
 /// Default per-tool-result byte cap for the channel / sub-agent paths, which do
 /// not carry a session `ContextManager` to source the configured budget from.
 /// Mirrors the `ContextConfig::tool_result_budget_bytes` default (16 KiB).
-pub const DEFAULT_TOOL_RESULT_BUDGET_BYTES: usize = 16 * 1024;
+const DEFAULT_TOOL_RESULT_BUDGET_BYTES: usize = 16 * 1024;
 
 /// Config bundle for the openhuman context middlewares installed on a turn.
 ///
 /// Cheap to clone (the summarizer is an `Arc`). An all-default value installs
 /// nothing — [`install`](Self::install) is a no-op.
 #[derive(Clone, Default)]
-pub struct TurnContextMiddleware {
+pub(crate) struct TurnContextMiddleware {
     /// Per-tool-result byte cap. `0` disables the cap.
-    pub tool_result_budget_bytes: usize,
+    pub(crate) tool_result_budget_bytes: usize,
     /// Optional semantic tool-output summarizer (progressive disclosure).
-    pub payload_summarizer: Option<Arc<dyn PayloadSummarizer>>,
+    pub(crate) payload_summarizer: Option<Arc<dyn PayloadSummarizer>>,
+    /// Optional action-workspace artifact sink for oversized tool results.
+    pub(crate) artifact_store: Option<ToolResultArtifactStore>,
+    /// Whether TokenJuice content-aware compaction runs before output caps.
+    pub(crate) tokenjuice_compaction_enabled: bool,
+    /// Agent-level TokenJuice profile for tool-result compaction.
+    pub(crate) tokenjuice_compression: AgentTokenjuiceCompression,
     /// Warn on volatile tokens in the system prompt (KV-cache diagnostic).
-    pub cache_align: bool,
+    pub(crate) cache_align: bool,
     /// Keep-recent count for microcompact tool-body clearing. `0` disables it.
-    pub microcompact_keep_recent: usize,
+    pub(crate) microcompact_keep_recent: usize,
     /// Whether the LLM summarization step (`ContextCompressionMiddleware`) may be
     /// installed on this turn. `false` when `[context].enabled` or
     /// `autocompact_enabled` is off, so a diagnostic/test opt-out doesn't spend
     /// summarizer tokens or rewrite history. The deterministic hard-trim backstop
     /// still installs regardless. Defaults to `true` (see [`defaults`](Self::defaults)).
-    pub autocompact_enabled: bool,
+    pub(crate) autocompact_enabled: bool,
     /// "Super context" first-turn context collection. `Some` installs the
     /// [`SuperContextMiddleware`] graph node; `None` (the default, and every
     /// non-chat path) skips it. Only the chat turn sets this — and only when its
     /// gate (`should_run_super_context`) passes.
-    pub super_context: Option<SuperContextConfig>,
+    pub(crate) super_context: Option<SuperContextConfig>,
     /// Progressive-disclosure handoff: when set (integrations_agent with a
     /// resolved toolkit), oversized tool results are stashed in the shared
     /// [`ResultHandoffCache`] and replaced with an `extract_from_result` drill-in
     /// placeholder. `None` everywhere else.
-    pub handoff: Option<HandoffConfig>,
+    pub(crate) handoff: Option<HandoffConfig>,
 }
 
 /// Config for the [`HandoffMiddleware`]: the per-spawn cache (shared with the
 /// `extract_from_result` tool) plus the ids used in handoff log lines.
 #[derive(Clone)]
-pub struct HandoffConfig {
-    pub cache: Arc<crate::openhuman::agent::harness::subagent_runner::ResultHandoffCache>,
-    pub agent_id: String,
-    pub task_id: String,
+pub(crate) struct HandoffConfig {
+    pub(crate) cache: Arc<crate::openhuman::agent::harness::subagent_runner::ResultHandoffCache>,
+    pub(crate) agent_id: String,
+    pub(crate) task_id: String,
+}
+
+/// SHADOW tool-exposure middleware (issue #4249, 01.3 — dynamic exposure).
+///
+/// This is the **adapter-first landing** of the crate-native tool-selection
+/// layer. It expresses OpenHuman's exposure policy (agent
+/// `tool_allowlist`/`tool_denylist` + sub-agent scope + MCP visibility + channel
+/// permission ceiling — all already collapsed by the precompute path into the
+/// single `allowed` visible set handed to `assemble_turn_harness`) as a composed
+/// crate selection layer:
+///
+/// - a [`ToolAllowlistMiddleware`] for the static allow guard, and
+/// - one [`ContextualToolSelectionMiddleware`] built via
+///   [`ContextualToolSelectionMiddleware::inheriting`] so a delegated child can
+///   only ever *narrow* the parent's exposure (sub-agent-cannot-exceed-parent).
+///
+/// It runs in **SHADOW**: on the first model call it drives the composed crate
+/// selection over a scratch [`ModelRequest`] built from the **broad candidate
+/// set** (not the live request, whose `tools` OpenHuman already narrowed), so it
+/// (a) makes the exposure decision **event-native** via the crate selection's own
+/// [`AgentEvent::ToolsFiltered`] emit, and (b) logs any DIVERGENCE (grep-friendly
+/// `[tool-exposure]`) between what the crate layer would expose and the set
+/// OpenHuman actually registered as callable. It **never** mutates the live
+/// `ModelRequest::tools`, so the model's actually-callable tool set is
+/// byte-identical to today (zero behavior risk). Exposure is fail-closed in the
+/// COMPUTATION (a candidate absent from `allowed` is excluded), but that decision
+/// is only logged/emitted — not enforced — this slice.
+///
+/// Ownership flip (making this crate selection the sole authority + deleting
+/// `agent/harness/tool_filter.rs` and `subagent_runner/tool_prep.rs`) is the
+/// GATED follow-up, once the `[tool-exposure]` divergence logs show parity.
+pub(super) struct OpenHumanToolExposureShadowMiddleware {
+    /// Static allow guard (crate). Held for the fail-closed parity cross-check;
+    /// NOT installed as a live `before_tool` execution guard this slice —
+    /// OpenHuman already registers only the `allowed` set, so the model can never
+    /// call a hidden tool.
+    allowlist: ToolAllowlistMiddleware,
+    /// The composed contextual selection layer, built via `inheriting(...)`:
+    /// parent ceiling = broad candidate set, child = precomputed visible set. Its
+    /// `before_model` drives the shadow retain + emits `ToolsFiltered`.
+    selection: ContextualToolSelectionMiddleware,
+    /// Broad candidate tool set (names before the precompute narrowed it), as
+    /// scratch schemas the shadow selection filters over.
+    candidates: Vec<ToolSchema>,
+    /// The set OpenHuman actually registered as callable this turn — the
+    /// divergence reference.
+    registered: std::collections::HashSet<String>,
+    /// agent id / task kind / security tier / channel encoded as selection tags
+    /// (carried onto the scratch request + surfaced in the divergence log). The
+    /// `inheriting`/`from_lists` predicate is name-based today, so these tags are
+    /// documentary context for the ownership-flip follow-up.
+    tags: Vec<String>,
+    /// One-shot latch — `before_model` fires on every model call, but the shadow
+    /// exposure decision is a once-per-run computation.
+    ran: AtomicBool,
+}
+
+impl OpenHumanToolExposureShadowMiddleware {
+    /// Build the shadow layer from the SAME inputs the precompute path feeds the
+    /// runner: the broad `candidate_names` and the narrowed `allowed` visible set.
+    /// An empty `allowed` means "all candidates visible" (OpenHuman convention).
+    pub(super) fn new(
+        candidate_names: &[String],
+        allowed: &std::collections::HashSet<String>,
+        tags: Vec<String>,
+    ) -> Self {
+        // Effective visible set = the OpenHuman-precomputed `allowed` (or every
+        // candidate when `allowed` is empty). Fail-closed: a candidate absent from
+        // `allowed` is treated as excluded (unclassified -> not exposed).
+        let registered: std::collections::HashSet<String> = if allowed.is_empty() {
+            candidate_names.iter().cloned().collect()
+        } else {
+            candidate_names
+                .iter()
+                .filter(|name| allowed.contains(*name))
+                .cloned()
+                .collect()
+        };
+        let excluded: Vec<String> = candidate_names
+            .iter()
+            .filter(|name| !registered.contains(*name))
+            .cloned()
+            .collect();
+        // Compose the crate selection via `inheriting` so a child can only narrow:
+        // parent ceiling = the broad candidate set (deny none), child = the
+        // precomputed visible set (deny the withheld candidates). The effective
+        // allow is `candidates ∩ registered == registered ⊆ candidates`, so the
+        // decision can never widen beyond what the parent candidate context could
+        // grant — the sub-agent-cannot-exceed-parent invariant, computed.
+        let selection = ContextualToolSelectionMiddleware::inheriting(
+            Some(candidate_names.to_vec()),
+            Vec::<String>::new(),
+            Some(registered.iter().cloned().collect::<Vec<_>>()),
+            excluded,
+        );
+        let allowlist = ToolAllowlistMiddleware::new(registered.iter().cloned());
+        let candidates = candidate_names
+            .iter()
+            .map(|name| ToolSchema::new(name.clone(), String::new(), serde_json::json!({})))
+            .collect();
+        Self {
+            allowlist,
+            selection,
+            candidates,
+            registered,
+            tags,
+            ran: AtomicBool::new(false),
+        }
+    }
 }
 
 /// Inputs the [`SuperContextMiddleware`] node needs to run its first-turn
 /// read-only context-collection pass.
 #[derive(Clone)]
-pub struct SuperContextConfig {
+pub(crate) struct SuperContextConfig {
     /// The raw user ask, used as the context scout's query.
-    pub user_message: String,
+    pub(crate) user_message: String,
 }
 
 impl TurnContextMiddleware {
     /// A sensible default for turn paths without a session `ContextManager`
     /// (channel / sub-agent): cache-align warnings on and the default tool-result
     /// byte cap, no summarizer or microcompact.
-    pub fn defaults() -> Self {
+    pub(crate) fn defaults() -> Self {
         Self {
             tool_result_budget_bytes: DEFAULT_TOOL_RESULT_BUDGET_BYTES,
             payload_summarizer: None,
+            artifact_store: None,
+            tokenjuice_compaction_enabled: false,
+            tokenjuice_compression: AgentTokenjuiceCompression::Off,
             cache_align: true,
             microcompact_keep_recent: 0,
             autocompact_enabled: true,
@@ -116,12 +240,14 @@ impl TurnContextMiddleware {
     }
 
     /// `true` when no middleware would be installed.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.tool_result_budget_bytes == 0
             && self.payload_summarizer.is_none()
+            && !self.tokenjuice_compaction_enabled
             && !self.cache_align
             && self.microcompact_keep_recent == 0
             && self.super_context.is_none()
+            && self.handoff.is_none()
     }
 
     /// Push the enabled middlewares onto `harness`.
@@ -130,7 +256,11 @@ impl TurnContextMiddleware {
     /// microcompact (clear tool bodies) are installed **before** the caller's
     /// summarization / trim middlewares — microcompact frees cheap tokens first,
     /// then summarization/trim handle the rest.
-    pub fn install(self, harness: &mut AgentHarness<()>, tool_sets: &[Arc<Vec<Box<dyn Tool>>>]) {
+    pub(crate) fn install(
+        self,
+        harness: &mut AgentHarness<()>,
+        tool_policies: HashMap<String, TaToolPolicy>,
+    ) {
         // Super context runs first: it prepares the read-only context bundle and
         // folds it into the first model call's user message before any other
         // before_model hook inspects the request.
@@ -158,13 +288,109 @@ impl TurnContextMiddleware {
                 task_id: handoff.task_id,
             }));
         }
-        if self.tool_result_budget_bytes > 0 || self.payload_summarizer.is_some() {
+        if self.tool_result_budget_bytes > 0
+            || self.payload_summarizer.is_some()
+            || self.tokenjuice_compaction_enabled
+        {
             harness.push_middleware(Arc::new(ToolOutputMiddleware {
                 budget_bytes: self.tool_result_budget_bytes,
                 payload_summarizer: self.payload_summarizer,
-                tool_sets: tool_sets.to_vec(),
+                artifact_store: self.artifact_store,
+                tokenjuice_compaction_enabled: self.tokenjuice_compaction_enabled,
+                tokenjuice_compression: self.tokenjuice_compression,
+                tool_policies,
             }));
         }
+    }
+}
+
+fn estimate_output_tokens(bytes: usize) -> u64 {
+    bytes.div_ceil(4) as u64
+}
+
+#[async_trait]
+impl Middleware<()> for OpenHumanToolExposureShadowMiddleware {
+    fn name(&self) -> &str {
+        "openhuman_tool_exposure_shadow"
+    }
+
+    async fn before_model(
+        &self,
+        ctx: &mut RunContext<()>,
+        state: &(),
+        request: &mut ModelRequest,
+    ) -> TaResult<()> {
+        // Once-per-run: the exposure decision is stable for the turn.
+        if self.ran.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
+        // SHADOW: drive the composed crate selection over a SCRATCH request built
+        // from the BROAD candidate set — deliberately NOT the live `request`,
+        // whose `tools` OpenHuman already narrowed to the visible set. This lets
+        // the crate layer compute the exposure decision over the full candidate
+        // context and emit it event-native (the crate
+        // `ContextualToolSelectionMiddleware::before_model` emits
+        // `AgentEvent::ToolsFiltered` on `ctx` for the withheld candidates) —
+        // without ever dropping a tool the model can actually call. The live
+        // `request.tools` is left untouched.
+        let mut scratch = ModelRequest {
+            tools: self.candidates.clone(),
+            model: request.model.clone(),
+            tags: self.tags.clone(),
+            ..Default::default()
+        };
+        // Reuse the crate selection's own retain + `ToolsFiltered` emit verbatim.
+        self.selection
+            .before_model(ctx, state, &mut scratch)
+            .await?;
+        let shadow_exposed: std::collections::HashSet<String> =
+            scratch.tools.iter().map(|s| s.name.clone()).collect();
+
+        // Divergence vs what OpenHuman actually registered as callable this turn.
+        let mut missing_from_shadow: Vec<&String> = self
+            .registered
+            .iter()
+            .filter(|name| !shadow_exposed.contains(*name))
+            .collect();
+        let mut extra_in_shadow: Vec<&String> = shadow_exposed
+            .iter()
+            .filter(|name| !self.registered.contains(*name))
+            .collect();
+        // Fail-closed cross-check: every shadow-exposed name must also pass the
+        // static allow guard (they are built from the same set, so this should be
+        // vacuously true; a mismatch would flag a policy-composition bug).
+        let mut allowlist_disagree: Vec<&String> = shadow_exposed
+            .iter()
+            .filter(|name| !self.allowlist.allows(name))
+            .collect();
+        missing_from_shadow.sort();
+        extra_in_shadow.sort();
+        allowlist_disagree.sort();
+
+        if missing_from_shadow.is_empty()
+            && extra_in_shadow.is_empty()
+            && allowlist_disagree.is_empty()
+        {
+            tracing::debug!(
+                exposed = shadow_exposed.len(),
+                candidates = self.candidates.len(),
+                registered = self.registered.len(),
+                tags = ?self.tags,
+                "[tool-exposure] shadow crate selection agrees with OpenHuman precompute (parity)"
+            );
+        } else {
+            tracing::warn!(
+                ?missing_from_shadow,
+                ?extra_in_shadow,
+                ?allowlist_disagree,
+                registered = self.registered.len(),
+                shadow_exposed = shadow_exposed.len(),
+                candidates = self.candidates.len(),
+                tags = ?self.tags,
+                "[tool-exposure] DIVERGENCE: shadow crate selection differs from OpenHuman precompute — NOT enforced (SHADOW; ownership flip is the gated follow-up)"
+            );
+        }
+        Ok(())
     }
 }
 
@@ -175,7 +401,7 @@ impl TurnContextMiddleware {
 /// `SubagentToolSource` ran on every tool result (via `apply_handoff`), which the
 /// agent_graph rewrite dropped. Errors and `extract_from_result`'s own output
 /// pass through unchanged (handled inside `apply_handoff`).
-pub struct HandoffMiddleware {
+pub(crate) struct HandoffMiddleware {
     cache: Arc<crate::openhuman::agent::harness::subagent_runner::ResultHandoffCache>,
     agent_id: String,
     task_id: String,
@@ -325,9 +551,137 @@ fn parse_context_bundle_has_enough_context(bundle: &str) -> Option<bool> {
 
 /// `before_model`: flag volatile tokens (UUIDs, timestamps, JWTs, …) in the
 /// system prompt that silently break the provider KV-cache prefix. Warn-only —
-/// never mutates the request. The graph analogue of the former
-/// `ContextManager::warn_if_cache_unstable`.
+/// never mutates the request. Replaces the deleted context cache-align reducer.
 struct CacheAlignMiddleware;
+
+/// One detected volatile token in the cache-hot system prompt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct VolatileFinding {
+    kind: &'static str,
+    sample: String,
+}
+
+fn detect_volatile_prompt_tokens(system_prompt: &str) -> Vec<VolatileFinding> {
+    let mut findings = Vec::new();
+    for tok in system_prompt
+        .split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | ':' | '_')))
+    {
+        if tok.len() < 8 {
+            continue;
+        }
+        if is_uuid(tok) {
+            findings.push(VolatileFinding {
+                kind: "uuid",
+                sample: redact_volatile_token(tok),
+            });
+        } else if is_jwt(tok) {
+            findings.push(VolatileFinding {
+                kind: "jwt",
+                sample: redact_volatile_token(tok),
+            });
+        } else if is_iso8601(tok) {
+            findings.push(VolatileFinding {
+                kind: "iso8601",
+                sample: redact_volatile_token(tok),
+            });
+        } else if is_hex_hash(tok) {
+            findings.push(VolatileFinding {
+                kind: "hex_hash",
+                sample: redact_volatile_token(tok),
+            });
+        }
+    }
+    findings
+}
+
+fn warn_if_cache_prompt_volatile(system_prompt: &str) -> usize {
+    let findings = detect_volatile_prompt_tokens(system_prompt);
+    if !findings.is_empty() {
+        let mut kinds: Vec<&str> = findings.iter().map(|finding| finding.kind).collect();
+        kinds.sort_unstable();
+        kinds.dedup();
+        let samples = findings
+            .iter()
+            .take(5)
+            .map(|finding| finding.sample.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        ::log::warn!(
+            "[tinyagents::cache-align] system prompt contains {} volatile token(s) ({}) samples={} -- KV-cache prefix may not hit; keep dynamic content out of the system prompt",
+            findings.len(),
+            kinds.join(", "),
+            samples,
+        );
+    }
+    findings.len()
+}
+
+fn redact_volatile_token(tok: &str) -> String {
+    let head: String = tok.chars().take(4).collect();
+    format!("{head}...")
+}
+
+fn is_uuid(tok: &str) -> bool {
+    if tok.len() != 36 {
+        return false;
+    }
+    let bytes = tok.as_bytes();
+    for (i, b) in bytes.iter().enumerate() {
+        let expect_dash = matches!(i, 8 | 13 | 18 | 23);
+        if expect_dash {
+            if *b != b'-' {
+                return false;
+            }
+        } else if !b.is_ascii_hexdigit() {
+            return false;
+        }
+    }
+    true
+}
+
+fn is_jwt(tok: &str) -> bool {
+    let segs: Vec<&str> = tok.split('.').collect();
+    if segs.len() != 3 {
+        return false;
+    }
+    segs.iter().all(|segment| {
+        segment.len() >= 4
+            && segment
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    }) && tok.starts_with("ey")
+}
+
+fn is_hex_hash(tok: &str) -> bool {
+    matches!(tok.len(), 32 | 40 | 64) && tok.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+fn is_iso8601(tok: &str) -> bool {
+    let b = tok.as_bytes();
+    if tok.len() < 19 {
+        return false;
+    }
+    let digit = |i: usize| b[i].is_ascii_digit();
+    digit(0)
+        && digit(1)
+        && digit(2)
+        && digit(3)
+        && b[4] == b'-'
+        && digit(5)
+        && digit(6)
+        && b[7] == b'-'
+        && digit(8)
+        && digit(9)
+        && (b[10] == b'T' || b[10] == b' ')
+        && digit(11)
+        && digit(12)
+        && b[13] == b':'
+        && digit(14)
+        && digit(15)
+        && b[16] == b':'
+        && digit(17)
+        && digit(18)
+}
 
 #[async_trait]
 impl Middleware<()> for CacheAlignMiddleware {
@@ -346,9 +700,101 @@ impl Middleware<()> for CacheAlignMiddleware {
             .iter()
             .find(|m| matches!(m, TaMessage::System(_)))
         {
-            crate::openhuman::agent::harness::compaction::cache_align::warn_if_volatile(
-                &sys.text(),
+            warn_if_cache_prompt_volatile(&sys.text());
+        }
+        Ok(())
+    }
+}
+
+/// Seed-free FNV-1a fingerprint (matches the crate's own prompt-layout hash
+/// approach) so a segment id is stable across process restarts — unlike Rust's
+/// randomly-seeded `SipHash`. Used to build content-fingerprinted prompt-cache
+/// segment ids: an unchanged system prompt / tool set keeps the same id (stable
+/// prefix), while injected volatile content flips it and surfaces as a
+/// `CacheLayoutEvent`.
+fn stable_prefix_fingerprint(data: &str) -> String {
+    const OFFSET_BASIS: u64 = 14_695_981_039_346_656_037;
+    const PRIME: u64 = 1_099_511_628_211;
+    let mut hash = OFFSET_BASIS;
+    for &byte in data.as_bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(PRIME);
+    }
+    format!("{hash:016x}")
+}
+
+/// `before_model`: declare the turn's stable prompt prefix (system prompt + tool
+/// schemas) as [`PromptSegment`]s on the [`ModelRequest`] (issue #4249, 03.2).
+///
+/// OpenHuman assembles the request's messages/tools directly rather than through
+/// the crate prompt builder, so `cache_segments` would otherwise stay empty and
+/// the crate `PromptCacheGuardMiddleware` (installed immediately after this) would
+/// have no prefix to protect. This stamps the segments with **content-fingerprint
+/// ids**: an unchanged system prompt + tool set yields a stable prefix, while an
+/// injected timestamp/uuid/etc. changes the fingerprint and the guard records a
+/// [`CacheLayoutEvent`](tinyagents::harness::cache::CacheLayoutEvent). The
+/// structured successor to [`CacheAlignMiddleware`]'s warn-only volatile-token
+/// scan (kept installed in parallel until parity is shown; deletion is a gated
+/// follow-up). Read-only w.r.t. the transcript — only sets `cache_segments` /
+/// `prompt_fingerprint`.
+pub(crate) struct PromptCacheSegmentMiddleware;
+
+#[async_trait]
+impl Middleware<()> for PromptCacheSegmentMiddleware {
+    fn name(&self) -> &str {
+        "prompt_cache_segments"
+    }
+
+    async fn before_model(
+        &self,
+        _ctx: &mut RunContext<()>,
+        _state: &(),
+        request: &mut ModelRequest,
+    ) -> TaResult<()> {
+        let mut segments: Vec<PromptSegment> = Vec::new();
+        // 1. System prompt — the cache-hottest stable prefix segment.
+        if let Some(sys) = request
+            .messages
+            .iter()
+            .find(|m| matches!(m, TaMessage::System(_)))
+        {
+            let fp = stable_prefix_fingerprint(&sys.text());
+            segments.push(PromptSegment {
+                id: format!("system:{fp}"),
+                role: SegmentRole::System,
+                cacheable: true,
+            });
+        }
+        // 2. Tool schemas — advertised tool *set* identity (names, in registration
+        //    order) forms the next stable prefix segment. A changed tool surface
+        //    legitimately busts the prefix; an unchanged one keeps it stable.
+        if !request.tools.is_empty() {
+            let joined = request
+                .tools
+                .iter()
+                .map(|t| t.name.as_str())
+                .collect::<Vec<_>>()
+                .join(",");
+            let fp = stable_prefix_fingerprint(&joined);
+            segments.push(PromptSegment {
+                id: format!("tools:{fp}"),
+                role: SegmentRole::Tools,
+                cacheable: true,
+            });
+        }
+        if !segments.is_empty() {
+            let joined_ids = segments
+                .iter()
+                .map(|s| s.id.as_str())
+                .collect::<Vec<_>>()
+                .join("|");
+            request.prompt_fingerprint = Some(stable_prefix_fingerprint(&joined_ids));
+            tracing::debug!(
+                segment_count = segments.len(),
+                fingerprint = request.prompt_fingerprint.as_deref().unwrap_or(""),
+                "[cache] declared stable prompt-prefix segments for KV-cache guard"
             );
+            request.cache_segments = segments;
         }
         Ok(())
     }
@@ -409,19 +855,23 @@ struct ToolOutputMiddleware {
     /// Fallback per-tool-result byte cap for tools that don't declare their own.
     budget_bytes: usize,
     payload_summarizer: Option<Arc<dyn PayloadSummarizer>>,
-    /// Shared tool sets, used to honor a tool's own `max_result_size_chars()`
-    /// cap (issue #4249, Phase 1 Task C) instead of the flat `budget_bytes`.
-    tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
+    artifact_store: Option<ToolResultArtifactStore>,
+    tokenjuice_compaction_enabled: bool,
+    tokenjuice_compression: AgentTokenjuiceCompression,
+    /// SDK policy snapshot keyed by tool name. Used to honor the adapter-mapped
+    /// `max_result_size_chars()` cap without re-querying the OpenHuman tool
+    /// trait from `after_tool`.
+    tool_policies: HashMap<String, TaToolPolicy>,
 }
 
 impl ToolOutputMiddleware {
-    /// The tool's own declared character cap, if any.
+    /// The tool's own declared cap, if any. The adapter maps OpenHuman's
+    /// `max_result_size_chars()` into `ToolRuntime.max_result_bytes`; preserving
+    /// char-based truncation here keeps the existing model-facing marker stable.
     fn tool_char_cap(&self, name: &str) -> Option<usize> {
-        self.tool_sets
-            .iter()
-            .flat_map(|set| set.iter())
-            .find(|t| t.name() == name)
-            .and_then(|t| t.max_result_size_chars())
+        self.tool_policies
+            .get(name)
+            .and_then(|policy| policy.runtime.max_result_bytes)
     }
 }
 
@@ -433,7 +883,7 @@ impl Middleware<()> for ToolOutputMiddleware {
 
     async fn after_tool(
         &self,
-        _ctx: &mut RunContext<()>,
+        ctx: &mut RunContext<()>,
         _state: &(),
         result: &mut TaToolResult,
     ) -> TaResult<()> {
@@ -442,7 +892,7 @@ impl Middleware<()> for ToolOutputMiddleware {
         //    Failures never break the tool call (the trait swallows them).
         if let Some(ps) = &self.payload_summarizer {
             if let Ok(Some(payload)) = ps
-                .maybe_summarize(&result.name, None, &result.content)
+                .maybe_summarize_in_parent(ctx, &result.name, None, &result.content)
                 .await
             {
                 tracing::info!(
@@ -451,11 +901,35 @@ impl Middleware<()> for ToolOutputMiddleware {
                     to_bytes = payload.summary_bytes,
                     "[tinyagents::mw] payload_summarizer compressed tool output"
                 );
+                ctx.emit(AgentEvent::Compressed {
+                    from_tokens: estimate_output_tokens(payload.original_bytes),
+                    to_tokens: estimate_output_tokens(payload.summary_bytes),
+                });
                 result.content = payload.summary;
             }
         }
 
-        // 2. Per-tool **char** cap — a tool that declares `max_result_size_chars`
+        // 2. TokenJuice content-aware compaction. This mirrors the legacy
+        //    `agent_tool_exec` stage that ran after semantic summarization and
+        //    before the hard output caps.
+        let before_tokenjuice_bytes = result.content.len();
+        let compacted = crate::openhuman::tokenjuice::compact_output_with_policy(
+            std::mem::take(&mut result.content),
+            &result.name,
+            self.tokenjuice_compaction_enabled,
+            self.tokenjuice_compression,
+        )
+        .await;
+        result.content = compacted;
+        let after_tokenjuice_bytes = result.content.len();
+        if after_tokenjuice_bytes < before_tokenjuice_bytes {
+            ctx.emit(AgentEvent::Compressed {
+                from_tokens: estimate_output_tokens(before_tokenjuice_bytes),
+                to_tokens: estimate_output_tokens(after_tokenjuice_bytes),
+            });
+        }
+
+        // 3. Per-tool **char** cap — a tool that declares `max_result_size_chars`
         //    caps its own output in characters, with the tool-cap marker the model
         //    was taught to read (legacy engine parity). Distinct from the generic
         //    byte budget below: the tool cap is the tool's own contract.
@@ -478,13 +952,60 @@ impl Middleware<()> for ToolOutputMiddleware {
             }
         }
 
-        // 3. Shared byte-cap backstop — truncate at a UTF-8 boundary with a marker.
+        // 4. Shared byte-cap backstop — truncate at a UTF-8 boundary with a marker.
         //    Only for tools with no cap of their own (a capped tool already bounded
         //    itself above; stacking the two markers would double-truncate).
         if tool_cap.is_none() && self.budget_bytes > 0 {
-            let (capped, outcome) =
-                apply_tool_result_budget(std::mem::take(&mut result.content), self.budget_bytes);
-            if outcome.truncated {
+            let (capped, outcome) = apply_per_result_persistence(
+                std::mem::take(&mut result.content),
+                self.artifact_store.as_ref(),
+                &result.name,
+                Some(&result.call_id),
+                self.budget_bytes,
+            )
+            .await;
+            if outcome.persisted {
+                tracing::info!(
+                    tool = %result.name,
+                    from_bytes = outcome.original_bytes,
+                    to_bytes = outcome.final_bytes,
+                    "[tinyagents::mw] tool_result_artifact persisted oversized output"
+                );
+                if let Some(path) = outcome.artifact_path.as_deref() {
+                    if let Some(store) = ctx.stores.get(TINYAGENTS_TOOL_RESULT_ARTIFACT_STORE) {
+                        let key = result.call_id.clone();
+                        let mut fields = serde_json::Map::new();
+                        fields.insert("tool".to_string(), result.name.clone().into());
+                        fields.insert("call_id".to_string(), result.call_id.clone().into());
+                        fields.insert("artifact_path".to_string(), path.to_string().into());
+                        fields.insert(
+                            "original_bytes".to_string(),
+                            serde_json::Value::from(outcome.original_bytes as u64),
+                        );
+                        fields.insert(
+                            "preview_bytes".to_string(),
+                            serde_json::Value::from(outcome.final_bytes as u64),
+                        );
+                        let index_result: tinyagents::Result<()> =
+                            store.put("tool_results", &key, fields.into()).await;
+                        if let Err(err) = index_result {
+                            tracing::warn!(
+                                tool = %result.name,
+                                call_id = %result.call_id,
+                                error = %err,
+                                "[tinyagents::mw] failed to index tool_result_artifact"
+                            );
+                        } else {
+                            tracing::debug!(
+                                tool = %result.name,
+                                call_id = %result.call_id,
+                                artifact_path = %path,
+                                "[tinyagents::mw] indexed tool_result_artifact in run store"
+                            );
+                        }
+                    }
+                }
+            } else if outcome.original_bytes != outcome.final_bytes {
                 tracing::debug!(
                     tool = %result.name,
                     from_bytes = outcome.original_bytes,
@@ -510,7 +1031,7 @@ impl Middleware<()> for ToolOutputMiddleware {
 /// letting it short-circuit cleanly. Tool-*internal* security (path/command
 /// policy via `live_policy`) stays inside each tool — it needs tool-specific
 /// operation semantics the harness boundary can't reconstruct generically.
-pub struct ApprovalSecurityMiddleware {
+pub(super) struct ApprovalSecurityMiddleware {
     /// The same `Arc`-shared tool sets the runner registers, used to resolve a
     /// call's OpenHuman `Tool` by name so `external_effect_with_args` can gate.
     tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
@@ -518,7 +1039,7 @@ pub struct ApprovalSecurityMiddleware {
 
 impl ApprovalSecurityMiddleware {
     /// Build the middleware over the runner's shared tool sets.
-    pub fn new(tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>) -> Self {
+    pub(super) fn new(tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>) -> Self {
         Self { tool_sets }
     }
 
@@ -603,12 +1124,12 @@ impl ToolMiddleware<()> for ApprovalSecurityMiddleware {
 /// (e.g. phone calls) would execute from the model loop. Applies on every path
 /// (channel, session, sub-agent) since the restriction is intrinsic to the tool,
 /// not the session — installed unconditionally.
-pub struct CliRpcOnlyMiddleware {
+pub(super) struct CliRpcOnlyMiddleware {
     tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
 }
 
 impl CliRpcOnlyMiddleware {
-    pub fn new(tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>) -> Self {
+    pub(super) fn new(tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>) -> Self {
         Self { tool_sets }
     }
 
@@ -665,7 +1186,7 @@ impl ToolMiddleware<()> for CliRpcOnlyMiddleware {
 /// blocking decision short-circuits with a model-consumable result carrying the
 /// same `"Tool '<name>' <denied|requires approval> by policy '<policy>': <reason>"`
 /// wording the engine produced.
-pub struct ToolPolicyMiddleware {
+pub(super) struct ToolPolicyMiddleware {
     policy: Arc<dyn crate::openhuman::agent::tool_policy::ToolPolicy>,
     /// The session's channel-permission snapshot — enforces the per-channel deny
     /// + per-call permission-level ceiling the engine ran in `agent_tool_exec`.
@@ -674,22 +1195,16 @@ pub struct ToolPolicyMiddleware {
     /// `Tool` can be resolved for its generated-tool runtime context and its
     /// per-call permission level.
     tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
-    /// The advertised (visible) tool-name whitelist. Non-empty = restricted; a
-    /// call outside it is "not available to this agent" (the engine's first gate).
-    /// A non-visible tool is never registered, so it reaches here rewritten onto
-    /// the recovery sentinel — its original name rides `requested_tool`.
-    visible_tool_names: HashSet<String>,
     session_id: String,
     channel: String,
     agent_definition_id: String,
 }
 
 impl ToolPolicyMiddleware {
-    pub fn new(
+    pub(super) fn new(
         policy: Arc<dyn crate::openhuman::agent::tool_policy::ToolPolicy>,
         session: crate::openhuman::agent_tool_policy::ToolPolicySession,
         tool_sets: Vec<Arc<Vec<Box<dyn Tool>>>>,
-        visible_tool_names: HashSet<String>,
         session_id: String,
         channel: String,
         agent_definition_id: String,
@@ -698,7 +1213,6 @@ impl ToolPolicyMiddleware {
             policy,
             session,
             tool_sets,
-            visible_tool_names,
             session_id,
             channel,
             agent_definition_id,
@@ -767,36 +1281,6 @@ impl ToolMiddleware<()> for ToolPolicyMiddleware {
         use crate::openhuman::agent::tool_policy::{
             ToolCallContext, ToolPolicyDecision, ToolPolicyRequest,
         };
-
-        // A call the model made to a tool outside the visible set was registered
-        // nowhere, so it arrives rewritten onto the recovery sentinel with the
-        // original name on `requested_tool`. When the session restricts visibility
-        // (non-empty set) and that original tool isn't visible, the engine's first
-        // gate produced "not available to this agent" — reproduce it here (takes
-        // precedence over the generic "Unknown tool" sentinel wording). A genuinely
-        // unknown call with no visibility restriction still falls through to the
-        // sentinel's "Unknown tool" result.
-        if call.name == UNKNOWN_TOOL_SENTINEL {
-            if !self.visible_tool_names.is_empty() {
-                let requested = call
-                    .arguments
-                    .get("requested_tool")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default();
-                if !requested.is_empty() && !self.visible_tool_names.contains(requested) {
-                    let content = format!("Tool '{requested}' is not available to this agent");
-                    return Ok(MiddlewareToolOutcome::Result(TaToolResult {
-                        call_id: call.id,
-                        name: call.name,
-                        content: content.clone(),
-                        raw: None,
-                        error: Some(content),
-                        elapsed_ms: 0,
-                    }));
-                }
-            }
-            return next.run(ctx, state, call).await;
-        }
 
         // Channel-permission ceiling first (session deny + per-call permission
         // level), mirroring the engine order in `agent_tool_exec`.
@@ -868,67 +1352,18 @@ impl ToolMiddleware<()> for ToolPolicyMiddleware {
     }
 }
 
-/// `before_tool`: rewrite a call to an **unadvertised** tool onto the recovery
-/// sentinel (issue #4249, Phase 1 Task B) so a hallucinated tool name is a
-/// recoverable [`UnknownToolAdapter`](super::tools::UnknownToolAdapter) result
-/// rather than a fatal `ToolNotFound`. `before_tool` runs before the harness
-/// resolves the tool, so the rewrite lands in time.
-///
-/// This moves the decision out of `ProviderModel::response_to_model_response`
-/// (which used to carry a `valid_tools` set) to the tool boundary, where it
-/// applies uniformly to native and text-parsed tool calls. The sentinel handler
-/// is still required (the crate has no "tool not found → repair" hook — SDK gap),
-/// but it remains internal and is never advertised to the model.
-pub struct UnknownToolRewriteMiddleware {
-    /// The set of callable tool names (plus the sentinel). A call outside it is
-    /// rewritten onto the sentinel.
-    valid: Arc<HashSet<String>>,
-}
-
-impl UnknownToolRewriteMiddleware {
-    /// Build the middleware over the runner's valid-tool-name set.
-    pub fn new(valid: Arc<HashSet<String>>) -> Self {
-        Self { valid }
-    }
-}
-
-#[async_trait]
-impl Middleware<()> for UnknownToolRewriteMiddleware {
-    fn name(&self) -> &str {
-        "unknown_tool_rewrite"
-    }
-
-    async fn before_tool(
-        &self,
-        _ctx: &mut RunContext<()>,
-        _state: &(),
-        call: &mut TaToolCall,
-    ) -> TaResult<()> {
-        if call.name != UNKNOWN_TOOL_SENTINEL && !self.valid.contains(&call.name) {
-            let requested = std::mem::take(&mut call.name);
-            tracing::debug!(
-                requested = %requested,
-                "[tinyagents::mw] rewriting unknown tool call onto recovery sentinel"
-            );
-            call.arguments = serde_json::json!({ "requested_tool": requested });
-            call.name = UNKNOWN_TOOL_SENTINEL.to_string();
-        }
-        Ok(())
-    }
-}
-
 /// `after_tool`: capture each tool call's execution outcome (success + content)
 /// into a shared sink before the harness folds the result into a `Message::tool`
 /// that drops the `error` flag (issue #4249). Without this, a post-turn
 /// `ToolCallRecord` could only report every call as an optimistic success — the
 /// in-house engine tracked real per-call success. Runs last in the `after_tool`
 /// chain so it records the final (summarized/capped) content the transcript keeps.
-pub struct ToolOutcomeCaptureMiddleware {
+pub(crate) struct ToolOutcomeCaptureMiddleware {
     sink: super::ToolOutcomeSink,
 }
 
 impl ToolOutcomeCaptureMiddleware {
-    pub fn new(sink: super::ToolOutcomeSink) -> Self {
+    pub(crate) fn new(sink: super::ToolOutcomeSink) -> Self {
         Self { sink }
     }
 }
@@ -963,9 +1398,8 @@ impl Middleware<()> for ToolOutcomeCaptureMiddleware {
 /// those to `Value::Null`, which the harness then rejects against an object
 /// schema and aborts the whole turn. The in-house engine recovered such a call by
 /// running the tool with `{}`; restore that so a single bad tool call is
-/// recoverable rather than fatal. The recovery sentinel's own
-/// `{ "requested_tool": … }` payload is already an object, so it is untouched.
-pub struct ArgRecoveryMiddleware;
+/// recoverable rather than fatal.
+pub(crate) struct ArgRecoveryMiddleware;
 
 #[async_trait]
 impl Middleware<()> for ArgRecoveryMiddleware {
@@ -1001,7 +1435,7 @@ impl Middleware<()> for ArgRecoveryMiddleware {
 /// post-call `StopHookMiddleware` per-turn USD cap. Projecting the *next* call's
 /// cost pre-spend (vs the already-exceeded check here) needs an input-token
 /// estimate — a follow-up.
-pub struct CostBudgetMiddleware;
+pub(crate) struct CostBudgetMiddleware;
 
 #[async_trait]
 impl Middleware<()> for CostBudgetMiddleware {
@@ -1080,7 +1514,7 @@ const HARD_REJECT_REPEAT_THRESHOLD: usize = 2;
 /// On trip it records a root-cause summary into the shared [`HaltSummarySlot`]
 /// (the turn overrides its final text with it) and pauses the run via the shared
 /// steering handle (same mechanism as the stop-hook / cap pausers).
-pub struct RepeatedToolFailureMiddleware {
+pub(crate) struct RepeatedToolFailureMiddleware {
     handle: SteeringHandle,
     identical_threshold: usize,
     halt_summary: super::HaltSummarySlot,
@@ -1103,7 +1537,7 @@ struct FailureState {
 impl RepeatedToolFailureMiddleware {
     /// Build the breaker. `identical_threshold` (the identical-signature retry
     /// ceiling) is clamped to at least 2 — a single failure is never a loop.
-    pub fn new(
+    pub(crate) fn new(
         handle: SteeringHandle,
         identical_threshold: usize,
         halt_summary: super::HaltSummarySlot,
@@ -1179,15 +1613,7 @@ impl Middleware<()> for RepeatedToolFailureMiddleware {
         // arguments" halt only fires when the args truly repeat.
         let err_line = err.lines().next().unwrap_or(err);
         let sig = format!("{}\u{1f}{arg_fp}\u{1f}{err_line}", result.name);
-        // The unknown-tool recovery is a failure the model can correct (it got the
-        // "unknown tool" feedback), so it must NOT feed the generic *any*-failure
-        // no-progress counter — else a turn that recovers from one bad tool name
-        // and then legitimately exhausts its iteration budget would trip the
-        // backstop instead of hitting the cap. It still feeds the *identical*-repeat
-        // counter, so re-issuing the SAME unavailable tool halts with a root cause.
-        if result.name != UNKNOWN_TOOL_SENTINEL {
-            state.consecutive += 1;
-        }
+        state.consecutive += 1;
         let same_count = match &state.last_sig {
             Some(prev) if *prev == sig => {
                 state.same_count += 1;
@@ -1336,6 +1762,16 @@ mod tests {
         assert!(TurnContextMiddleware::default().is_empty());
     }
 
+    #[test]
+    fn tokenjuice_only_bundle_is_not_empty() {
+        let mw = TurnContextMiddleware {
+            tokenjuice_compaction_enabled: true,
+            tokenjuice_compression: AgentTokenjuiceCompression::Light,
+            ..Default::default()
+        };
+        assert!(!mw.is_empty());
+    }
+
     // ── SuperContextMiddleware helpers ──────────────────────────────────────
 
     #[test]
@@ -1469,7 +1905,10 @@ mod tests {
         let mw = ToolOutputMiddleware {
             budget_bytes: 100,
             payload_summarizer: None,
-            tool_sets: vec![],
+            artifact_store: None,
+            tokenjuice_compaction_enabled: false,
+            tokenjuice_compression: AgentTokenjuiceCompression::Off,
+            tool_policies: HashMap::new(),
         };
         let mut result = tool_result("echo", &"x".repeat(5_000));
         mw.after_tool(&mut ctx(), &(), &mut result).await.unwrap();
@@ -1486,7 +1925,10 @@ mod tests {
         let mw = ToolOutputMiddleware {
             budget_bytes: 1_000,
             payload_summarizer: None,
-            tool_sets: vec![],
+            artifact_store: None,
+            tokenjuice_compaction_enabled: false,
+            tokenjuice_compression: AgentTokenjuiceCompression::Off,
+            tool_policies: HashMap::new(),
         };
         let mut result = tool_result("echo", "tiny");
         mw.after_tool(&mut ctx(), &(), &mut result).await.unwrap();
@@ -1495,15 +1937,26 @@ mod tests {
 
     #[test]
     fn tool_char_cap_reads_the_tools_own_declared_cap() {
-        let tools: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![Box::new(FakeTool {
-            name: "big",
-            cap: Some(10),
-            external: false,
-        })]);
+        let mut tool_policies = HashMap::new();
+        tool_policies.insert(
+            "big".to_string(),
+            TaToolPolicy::classified().with_runtime(tinyagents::harness::tool::ToolRuntime {
+                timeout_ms: None,
+                max_retries: None,
+                idempotent: false,
+                cancelable: true,
+                sandbox: tinyagents::harness::tool::SandboxMode::Inherit,
+                max_result_bytes: Some(10),
+                streaming: false,
+            }),
+        );
         let mw = ToolOutputMiddleware {
             budget_bytes: 1_000,
             payload_summarizer: None,
-            tool_sets: vec![tools],
+            artifact_store: None,
+            tokenjuice_compaction_enabled: false,
+            tokenjuice_compression: AgentTokenjuiceCompression::Off,
+            tool_policies,
         };
         // Tool declares its own char cap → surfaced for the per-tool truncation.
         assert_eq!(mw.tool_char_cap("big"), Some(10));
@@ -1513,15 +1966,26 @@ mod tests {
 
     #[tokio::test]
     async fn tool_output_honors_a_tools_own_cap() {
-        let tools: Arc<Vec<Box<dyn Tool>>> = Arc::new(vec![Box::new(FakeTool {
-            name: "capped",
-            cap: Some(20),
-            external: false,
-        })]);
+        let mut tool_policies = HashMap::new();
+        tool_policies.insert(
+            "capped".to_string(),
+            TaToolPolicy::classified().with_runtime(tinyagents::harness::tool::ToolRuntime {
+                timeout_ms: None,
+                max_retries: None,
+                idempotent: false,
+                cancelable: true,
+                sandbox: tinyagents::harness::tool::SandboxMode::Inherit,
+                max_result_bytes: Some(20),
+                streaming: false,
+            }),
+        );
         let mw = ToolOutputMiddleware {
             budget_bytes: 100_000,
             payload_summarizer: None,
-            tool_sets: vec![tools],
+            artifact_store: None,
+            tokenjuice_compaction_enabled: false,
+            tokenjuice_compression: AgentTokenjuiceCompression::Off,
+            tool_policies,
         };
         let mut result = tool_result("capped", &"y".repeat(500));
         mw.after_tool(&mut ctx(), &(), &mut result).await.unwrap();
@@ -1532,49 +1996,6 @@ mod tests {
             "the tool's own 20-char cap should truncate with the tool-cap marker: {}",
             result.content
         );
-    }
-
-    // ── UnknownToolRewriteMiddleware ────────────────────────────────────────
-
-    #[tokio::test]
-    async fn unknown_tool_is_rewritten_onto_the_recovery_sentinel() {
-        let valid: Arc<HashSet<String>> = Arc::new(["echo".to_string()].into_iter().collect());
-        let mw = UnknownToolRewriteMiddleware::new(valid);
-        let mut call = TaToolCall {
-            id: "1".into(),
-            name: "frobnicate".into(),
-            arguments: json!({ "x": 1 }),
-        };
-        mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
-        assert_eq!(call.name, UNKNOWN_TOOL_SENTINEL);
-        assert_eq!(call.arguments["requested_tool"], json!("frobnicate"));
-    }
-
-    #[tokio::test]
-    async fn advertised_tool_is_left_untouched() {
-        let valid: Arc<HashSet<String>> = Arc::new(["echo".to_string()].into_iter().collect());
-        let mw = UnknownToolRewriteMiddleware::new(valid);
-        let mut call = TaToolCall {
-            id: "1".into(),
-            name: "echo".into(),
-            arguments: json!({ "msg": "hi" }),
-        };
-        mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
-        assert_eq!(call.name, "echo");
-        assert_eq!(call.arguments, json!({ "msg": "hi" }));
-    }
-
-    #[tokio::test]
-    async fn the_sentinel_itself_is_never_rewritten() {
-        let valid: Arc<HashSet<String>> = Arc::new(HashSet::new());
-        let mw = UnknownToolRewriteMiddleware::new(valid);
-        let mut call = TaToolCall {
-            id: "1".into(),
-            name: UNKNOWN_TOOL_SENTINEL.to_string(),
-            arguments: json!({ "requested_tool": "x" }),
-        };
-        mw.before_tool(&mut ctx(), &(), &mut call).await.unwrap();
-        assert_eq!(call.name, UNKNOWN_TOOL_SENTINEL);
     }
 
     // ── CostBudgetMiddleware ────────────────────────────────────────────────
