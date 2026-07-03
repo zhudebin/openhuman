@@ -5140,6 +5140,39 @@ const messages: TranslationMap = {
   'settings.persona.soul.loadError': 'No se pudo cargar SOUL.md',
   'settings.persona.soul.saveError': 'No se pudo guardar SOUL.md',
   'settings.persona.soul.resetError': 'No se pudo restablecer SOUL.md',
+  'settings.persona.builder.modeLabel': 'Modo del editor de persona',
+  'settings.persona.builder.modeGuided': 'Guiado',
+  'settings.persona.builder.modeAdvanced': 'Avanzado',
+  'settings.persona.builder.intro':
+    'Rellena unos campos y los escribimos en tu persona por ti. No hace falta markdown.',
+  'settings.persona.builder.personalityLabel': 'Personalidad',
+  'settings.persona.builder.personalityPlaceholder':
+    'p. ej. Cercano, curioso y directo. Honesto ante la incertidumbre.',
+  'settings.persona.builder.voiceLabel': 'Estilo de comunicación',
+  'settings.persona.builder.voicePlaceholder':
+    'p. ej. Empieza por la respuesta, sé breve y adapta mi tono.',
+  'settings.persona.builder.aboutLabel': 'Sobre ti',
+  'settings.persona.builder.aboutPlaceholder':
+    'p. ej. Dirijo un pequeño estudio de diseño y prefiero un lenguaje sencillo.',
+  'settings.persona.builder.preservedNote':
+    'Cualquier otra sección que hayas escrito a mano se conserva: cambia a Avanzado para ver la persona completa.',
+  'settings.persona.builder.securityNote': '¿Quieres elegir lo que el asistente puede hacer?',
+  'settings.persona.builder.securityLink': 'Abrir Acceso del agente',
+  'settings.persona.templates.heading': 'Empezar con una plantilla',
+  'settings.persona.templates.desc':
+    'Elige un punto de partida: rellena Personalidad y Estilo de comunicación. Después puedes editarlo todo.',
+  'settings.persona.templates.doctor.label': 'Asistente clínico',
+  'settings.persona.templates.doctor.desc': 'Cuidadoso, cita fuentes, señala la incertidumbre',
+  'settings.persona.templates.researcher.label': 'Asistente de investigación',
+  'settings.persona.templates.researcher.desc': 'Riguroso, estructurado, basado en evidencia',
+  'settings.persona.templates.executive.label': 'Asistente ejecutivo',
+  'settings.persona.templates.executive.desc': 'Conciso, decidido, orientado a la acción',
+  'settings.persona.templates.teacher.label': 'Docente',
+  'settings.persona.templates.teacher.desc': 'Paciente, explica paso a paso',
+  'settings.persona.templates.student.label': 'Compañero de estudio',
+  'settings.persona.templates.student.desc': 'Alentador, hace preguntas, lenguaje sencillo',
+  'settings.persona.templates.family.label': 'Asistente familiar',
+  'settings.persona.templates.family.desc': 'Cálido, amable, seguro para todas las edades',
   'settings.persona.appearanceHeading': 'Avatar y Voz',
   'settings.persona.appearanceDesc':
     'El color de la mascota, el avatar personalizado GIF y la voz de respuesta se configuran en los ajustes de la mascota.',

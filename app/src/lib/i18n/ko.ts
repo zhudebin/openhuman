@@ -4992,6 +4992,38 @@ const messages: TranslationMap = {
   'settings.persona.soul.loadError': 'SOUL.md를 불러올 수 없습니다',
   'settings.persona.soul.saveError': 'SOUL.md를 저장할 수 없습니다',
   'settings.persona.soul.resetError': 'SOUL.md를 초기화할 수 없습니다',
+  'settings.persona.builder.modeLabel': '페르소나 편집기 모드',
+  'settings.persona.builder.modeGuided': '가이드',
+  'settings.persona.builder.modeAdvanced': '고급',
+  'settings.persona.builder.intro':
+    '몇 가지 항목만 입력하면 페르소나에 대신 작성해 드립니다. 마크다운은 필요 없습니다.',
+  'settings.persona.builder.personalityLabel': '성격',
+  'settings.persona.builder.personalityPlaceholder':
+    '예: 따뜻하고 호기심 많고 직설적. 불확실할 땐 솔직하게.',
+  'settings.persona.builder.voiceLabel': '커뮤니케이션 스타일',
+  'settings.persona.builder.voicePlaceholder': '예: 답부터 말하고, 간결하게, 내 말투에 맞춰서.',
+  'settings.persona.builder.aboutLabel': '당신에 대해',
+  'settings.persona.builder.aboutPlaceholder':
+    '예: 작은 디자인 스튜디오를 운영하며 쉬운 표현을 선호합니다.',
+  'settings.persona.builder.preservedNote':
+    '직접 작성한 다른 섹션은 그대로 유지됩니다 — 전체 페르소나를 보려면 고급으로 전환하세요.',
+  'settings.persona.builder.securityNote': '어시스턴트가 할 수 있는 일을 정하시겠어요?',
+  'settings.persona.builder.securityLink': '에이전트 액세스 열기',
+  'settings.persona.templates.heading': '템플릿으로 시작',
+  'settings.persona.templates.desc':
+    '시작점을 고르세요 — 성격과 커뮤니케이션 스타일을 채워 줍니다. 이후 모두 수정할 수 있습니다.',
+  'settings.persona.templates.doctor.label': '임상 어시스턴트',
+  'settings.persona.templates.doctor.desc': '신중하고 출처를 밝히며 불확실성을 표시',
+  'settings.persona.templates.researcher.label': '리서치 어시스턴트',
+  'settings.persona.templates.researcher.desc': '엄밀하고 체계적이며 근거 우선',
+  'settings.persona.templates.executive.label': '임원 어시스턴트',
+  'settings.persona.templates.executive.desc': '간결하고 결단력 있으며 실행 중심',
+  'settings.persona.templates.teacher.label': '교사',
+  'settings.persona.templates.teacher.desc': '인내심 있게 단계별로 설명',
+  'settings.persona.templates.student.label': '공부 친구',
+  'settings.persona.templates.student.desc': '격려하고 퀴즈를 내며 쉬운 언어 사용',
+  'settings.persona.templates.family.label': '가족 어시스턴트',
+  'settings.persona.templates.family.desc': '따뜻하고 친근하며 모든 연령에 안전',
   'settings.persona.appearanceHeading': '아바타 및 음성',
   'settings.persona.appearanceDesc':
     '마스코트 색상, 사용자 지정 GIF 아바타, 응답 음성은 마스코트 설정에서 구성합니다.',

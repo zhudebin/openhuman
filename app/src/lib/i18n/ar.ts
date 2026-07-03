@@ -4939,6 +4939,38 @@ const messages: TranslationMap = {
   'settings.persona.soul.loadError': 'لا يمكن تحميل Xqx0xx',
   'settings.persona.soul.saveError': 'لا يُمكنُ أَنْ يَوفّرَ Xqx0xxx',
   'settings.persona.soul.resetError': 'لا يمكن إعادة تشغيل Xqx0xx',
+  'settings.persona.builder.modeLabel': 'وضع محرر الشخصية',
+  'settings.persona.builder.modeGuided': 'موجّه',
+  'settings.persona.builder.modeAdvanced': 'متقدّم',
+  'settings.persona.builder.intro':
+    'املأ بضعة حقول وسنكتبها في شخصيتك نيابةً عنك. لا حاجة إلى ماركداون.',
+  'settings.persona.builder.personalityLabel': 'الشخصية',
+  'settings.persona.builder.personalityPlaceholder':
+    'مثال: ودود وفضولي ومباشر. صادق عند عدم اليقين.',
+  'settings.persona.builder.voiceLabel': 'أسلوب التواصل',
+  'settings.persona.builder.voicePlaceholder': 'مثال: ابدأ بالإجابة، واجعلها موجزة، وطابق نبرتي.',
+  'settings.persona.builder.aboutLabel': 'نبذة عنك',
+  'settings.persona.builder.aboutPlaceholder':
+    'مثال: أدير استوديو تصميم صغيرًا وأفضّل اللغة البسيطة.',
+  'settings.persona.builder.preservedNote':
+    'تُحفظ أي أقسام أخرى كتبتها بنفسك — انتقل إلى «متقدّم» لرؤية الشخصية كاملة.',
+  'settings.persona.builder.securityNote': 'هل تريد تحديد ما يُسمح للمساعد بفعله؟',
+  'settings.persona.builder.securityLink': 'فتح وصول الوكيل',
+  'settings.persona.templates.heading': 'ابدأ من قالب',
+  'settings.persona.templates.desc':
+    'اختر نقطة بداية — تملأ الشخصية وأسلوب التواصل. يمكنك تعديل كل شيء لاحقًا.',
+  'settings.persona.templates.doctor.label': 'مساعد سريري',
+  'settings.persona.templates.doctor.desc': 'دقيق، يذكر المصادر، ينبّه إلى عدم اليقين',
+  'settings.persona.templates.researcher.label': 'مساعد بحثي',
+  'settings.persona.templates.researcher.desc': 'صارم، منظّم، يعتمد على الأدلة',
+  'settings.persona.templates.executive.label': 'مساعد تنفيذي',
+  'settings.persona.templates.executive.desc': 'موجز، حاسم، موجّه نحو العمل',
+  'settings.persona.templates.teacher.label': 'معلّم',
+  'settings.persona.templates.teacher.desc': 'صبور، يشرح خطوة بخطوة',
+  'settings.persona.templates.student.label': 'رفيق دراسة',
+  'settings.persona.templates.student.desc': 'محفّز، يطرح أسئلة، لغة بسيطة',
+  'settings.persona.templates.family.label': 'مساعد عائلي',
+  'settings.persona.templates.family.desc': 'ودود، لطيف، آمن لكل الأعمار',
   'settings.persona.appearanceHeading': 'صوت الأفاتار',
   'settings.persona.appearanceDesc':
     'لون الماسكوت، العرف Xqx0x avatar، وصوت الرد مصمم في أماكن مكوت.',

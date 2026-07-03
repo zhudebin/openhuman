@@ -5177,6 +5177,39 @@ const messages: TranslationMap = {
   'settings.persona.soul.loadError': 'SOUL.md konnte nicht geladen werden',
   'settings.persona.soul.saveError': 'SOUL.md konnte nicht gespeichert werden',
   'settings.persona.soul.resetError': 'SOUL.md konnte nicht zurückgesetzt werden',
+  'settings.persona.builder.modeLabel': 'Persona-Editor-Modus',
+  'settings.persona.builder.modeGuided': 'Geführt',
+  'settings.persona.builder.modeAdvanced': 'Erweitert',
+  'settings.persona.builder.intro':
+    'Füllen Sie ein paar Felder aus und wir schreiben sie für Sie in Ihre Persona. Kein Markdown nötig.',
+  'settings.persona.builder.personalityLabel': 'Persönlichkeit',
+  'settings.persona.builder.personalityPlaceholder':
+    'z. B. Warmherzig, neugierig und direkt. Ehrlich bei Unsicherheit.',
+  'settings.persona.builder.voiceLabel': 'Kommunikationsstil',
+  'settings.persona.builder.voicePlaceholder':
+    'z. B. Zuerst die Antwort, kurz halten und meinen Ton treffen.',
+  'settings.persona.builder.aboutLabel': 'Über Sie',
+  'settings.persona.builder.aboutPlaceholder':
+    'z. B. Ich leite ein kleines Designstudio und bevorzuge klare Sprache.',
+  'settings.persona.builder.preservedNote':
+    'Alle anderen von Hand geschriebenen Abschnitte bleiben erhalten — wechseln Sie zu „Erweitert“, um die vollständige Persona zu sehen.',
+  'settings.persona.builder.securityNote': 'Möchten Sie festlegen, was der Assistent tun darf?',
+  'settings.persona.builder.securityLink': 'Agentenzugriff öffnen',
+  'settings.persona.templates.heading': 'Mit einer Vorlage beginnen',
+  'settings.persona.templates.desc':
+    'Wählen Sie einen Ausgangspunkt — er füllt Persönlichkeit und Kommunikationsstil. Danach können Sie alles bearbeiten.',
+  'settings.persona.templates.doctor.label': 'Klinischer Assistent',
+  'settings.persona.templates.doctor.desc': 'Sorgfältig, nennt Quellen, weist auf Unsicherheit hin',
+  'settings.persona.templates.researcher.label': 'Forschungsassistent',
+  'settings.persona.templates.researcher.desc': 'Gründlich, strukturiert, evidenzbasiert',
+  'settings.persona.templates.executive.label': 'Assistent für Führungskräfte',
+  'settings.persona.templates.executive.desc': 'Prägnant, entschlossen, handlungsorientiert',
+  'settings.persona.templates.teacher.label': 'Lehrkraft',
+  'settings.persona.templates.teacher.desc': 'Geduldig, erklärt Schritt für Schritt',
+  'settings.persona.templates.student.label': 'Lernbegleiter',
+  'settings.persona.templates.student.desc': 'Ermutigend, stellt Quizfragen, einfache Sprache',
+  'settings.persona.templates.family.label': 'Familienassistent',
+  'settings.persona.templates.family.desc': 'Herzlich, freundlich, für alle Altersgruppen geeignet',
   'settings.persona.appearanceHeading': 'Avatar und Stimme',
   'settings.persona.appearanceDesc':
     'Maskottchenfarbe, benutzerdefinierter GIF-Avatar und Antwortstimme werden in den Maskottcheneinstellungen konfiguriert.',

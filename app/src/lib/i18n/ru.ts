@@ -5093,6 +5093,40 @@ const messages: TranslationMap = {
   'settings.persona.soul.loadError': 'Не удалось загрузить SOUL.md.',
   'settings.persona.soul.saveError': 'Не удалось сохранить SOUL.md.',
   'settings.persona.soul.resetError': 'Не удалось сбросить SOUL.md.',
+  'settings.persona.builder.modeLabel': 'Режим редактора персоны',
+  'settings.persona.builder.modeGuided': 'С подсказками',
+  'settings.persona.builder.modeAdvanced': 'Расширенный',
+  'settings.persona.builder.intro':
+    'Заполните несколько полей, и мы впишем их в вашу персону. Markdown не нужен.',
+  'settings.persona.builder.personalityLabel': 'Характер',
+  'settings.persona.builder.personalityPlaceholder':
+    'напр. Тёплый, любознательный и прямой. Честен в неопределённости.',
+  'settings.persona.builder.voiceLabel': 'Стиль общения',
+  'settings.persona.builder.voicePlaceholder': 'напр. Сначала ответ, кратко и в моём тоне.',
+  'settings.persona.builder.aboutLabel': 'О вас',
+  'settings.persona.builder.aboutPlaceholder':
+    'напр. У меня небольшая дизайн-студия, предпочитаю простой язык.',
+  'settings.persona.builder.preservedNote':
+    'Все другие разделы, написанные вручную, сохраняются — переключитесь на «Расширенный», чтобы увидеть персону целиком.',
+  'settings.persona.builder.securityNote': 'Хотите выбрать, что разрешено ассистенту?',
+  'settings.persona.builder.securityLink': 'Открыть доступ агента',
+  'settings.persona.templates.heading': 'Начать с шаблона',
+  'settings.persona.templates.desc':
+    'Выберите отправную точку — она заполнит «Характер» и «Стиль общения». Потом всё можно изменить.',
+  'settings.persona.templates.doctor.label': 'Клинический ассистент',
+  'settings.persona.templates.doctor.desc':
+    'Внимателен, ссылается на источники, отмечает неопределённость',
+  'settings.persona.templates.researcher.label': 'Научный ассистент',
+  'settings.persona.templates.researcher.desc':
+    'Строгий, структурированный, опирается на доказательства',
+  'settings.persona.templates.executive.label': 'Ассистент руководителя',
+  'settings.persona.templates.executive.desc': 'Краткий, решительный, ориентирован на действие',
+  'settings.persona.templates.teacher.label': 'Учитель',
+  'settings.persona.templates.teacher.desc': 'Терпеливый, объясняет шаг за шагом',
+  'settings.persona.templates.student.label': 'Помощник в учёбе',
+  'settings.persona.templates.student.desc': 'Поддерживающий, задаёт вопросы, простой язык',
+  'settings.persona.templates.family.label': 'Семейный ассистент',
+  'settings.persona.templates.family.desc': 'Тёплый, дружелюбный, подходит для всех возрастов',
   'settings.persona.appearanceHeading': 'Аватар и голос',
   'settings.persona.appearanceDesc':
     'Цвет талисмана, пользовательский аватар GIF и голос ответа настраиваются в настройках талисмана.',

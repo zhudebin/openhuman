@@ -5046,6 +5046,39 @@ const messages: TranslationMap = {
   'settings.persona.soul.loadError': 'SOUL',
   'settings.persona.soul.saveError': 'नहीं बचा सकता SOUL.md',
   'settings.persona.soul.resetError': 'SOUL.md रीसेट नहीं कर सका',
+  'settings.persona.builder.modeLabel': 'पर्सोना एडिटर मोड',
+  'settings.persona.builder.modeGuided': 'निर्देशित',
+  'settings.persona.builder.modeAdvanced': 'उन्नत',
+  'settings.persona.builder.intro':
+    'कुछ फ़ील्ड भरें और हम उन्हें आपके पर्सोना में लिख देंगे। मार्कडाउन की ज़रूरत नहीं।',
+  'settings.persona.builder.personalityLabel': 'व्यक्तित्व',
+  'settings.persona.builder.personalityPlaceholder':
+    'जैसे: गर्मजोश, जिज्ञासु और सीधा। अनिश्चितता पर ईमानदार।',
+  'settings.persona.builder.voiceLabel': 'संवाद शैली',
+  'settings.persona.builder.voicePlaceholder':
+    'जैसे: पहले उत्तर दें, संक्षिप्त रखें और मेरे लहजे से मेल खाएँ।',
+  'settings.persona.builder.aboutLabel': 'आपके बारे में',
+  'settings.persona.builder.aboutPlaceholder':
+    'जैसे: मैं एक छोटा डिज़ाइन स्टूडियो चलाता हूँ और सरल भाषा पसंद करता हूँ।',
+  'settings.persona.builder.preservedNote':
+    'आपके हाथ से लिखे अन्य अनुभाग सुरक्षित रहते हैं — पूरा पर्सोना देखने के लिए उन्नत पर जाएँ।',
+  'settings.persona.builder.securityNote': 'तय करना चाहते हैं कि असिस्टेंट क्या कर सकता है?',
+  'settings.persona.builder.securityLink': 'एजेंट एक्सेस खोलें',
+  'settings.persona.templates.heading': 'टेम्पलेट से शुरू करें',
+  'settings.persona.templates.desc':
+    'एक शुरुआती बिंदु चुनें — यह व्यक्तित्व और संवाद शैली भर देता है। बाद में आप सब कुछ बदल सकते हैं।',
+  'settings.persona.templates.doctor.label': 'क्लिनिकल सहायक',
+  'settings.persona.templates.doctor.desc': 'सावधान, स्रोत बताता है, अनिश्चितता दर्शाता है',
+  'settings.persona.templates.researcher.label': 'शोध सहायक',
+  'settings.persona.templates.researcher.desc': 'सटीक, व्यवस्थित, साक्ष्य-आधारित',
+  'settings.persona.templates.executive.label': 'कार्यकारी सहायक',
+  'settings.persona.templates.executive.desc': 'संक्षिप्त, निर्णायक, कार्य-केंद्रित',
+  'settings.persona.templates.teacher.label': 'शिक्षक',
+  'settings.persona.templates.teacher.desc': 'धैर्यवान, कदम-दर-कदम समझाता है',
+  'settings.persona.templates.student.label': 'अध्ययन साथी',
+  'settings.persona.templates.student.desc': 'प्रोत्साहित करता है, सवाल पूछता है, सरल भाषा',
+  'settings.persona.templates.family.label': 'पारिवारिक सहायक',
+  'settings.persona.templates.family.desc': 'गर्मजोश, मिलनसार, हर उम्र के लिए सुरक्षित',
   'settings.persona.appearanceHeading': 'अवतार और आवाज',
   'settings.persona.appearanceDesc':
     'Mascot रंग, कस्टम GIF अवतार, और उत्तर आवाज Mascot सेटिंग्स में कॉन्फ़िगर किया गया है।',

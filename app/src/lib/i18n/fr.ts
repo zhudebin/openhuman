@@ -5158,6 +5158,40 @@ const messages: TranslationMap = {
   'settings.persona.soul.loadError': 'Impossible de charger SOUL.md',
   'settings.persona.soul.saveError': "Impossible d'enregistrer SOUL.md",
   'settings.persona.soul.resetError': 'Impossible de réinitialiser SOUL.md',
+  'settings.persona.builder.modeLabel': 'Mode de l’éditeur de persona',
+  'settings.persona.builder.modeGuided': 'Guidé',
+  'settings.persona.builder.modeAdvanced': 'Avancé',
+  'settings.persona.builder.intro':
+    'Remplissez quelques champs et nous les écrivons dans votre persona. Aucun markdown requis.',
+  'settings.persona.builder.personalityLabel': 'Personnalité',
+  'settings.persona.builder.personalityPlaceholder':
+    'p. ex. Chaleureux, curieux et direct. Honnête face à l’incertitude.',
+  'settings.persona.builder.voiceLabel': 'Style de communication',
+  'settings.persona.builder.voicePlaceholder':
+    'p. ex. Commencez par la réponse, restez bref et adaptez mon ton.',
+  'settings.persona.builder.aboutLabel': 'À propos de vous',
+  'settings.persona.builder.aboutPlaceholder':
+    'p. ex. Je dirige un petit studio de design et je préfère un langage simple.',
+  'settings.persona.builder.preservedNote':
+    'Toutes les autres sections que vous avez écrites à la main sont conservées — passez en mode Avancé pour voir la persona complète.',
+  'settings.persona.builder.securityNote':
+    'Vous voulez choisir ce que l’assistant est autorisé à faire ?',
+  'settings.persona.builder.securityLink': 'Ouvrir Accès de l’agent',
+  'settings.persona.templates.heading': 'Partir d’un modèle',
+  'settings.persona.templates.desc':
+    'Choisissez un point de départ : il remplit Personnalité et Style de communication. Vous pourrez tout modifier ensuite.',
+  'settings.persona.templates.doctor.label': 'Assistant clinique',
+  'settings.persona.templates.doctor.desc': 'Prudent, cite ses sources, signale l’incertitude',
+  'settings.persona.templates.researcher.label': 'Assistant de recherche',
+  'settings.persona.templates.researcher.desc': 'Rigoureux, structuré, fondé sur des preuves',
+  'settings.persona.templates.executive.label': 'Assistant de direction',
+  'settings.persona.templates.executive.desc': 'Concis, décisif, orienté action',
+  'settings.persona.templates.teacher.label': 'Enseignant',
+  'settings.persona.templates.teacher.desc': 'Patient, explique étape par étape',
+  'settings.persona.templates.student.label': 'Partenaire d’étude',
+  'settings.persona.templates.student.desc': 'Encourageant, pose des questions, langage simple',
+  'settings.persona.templates.family.label': 'Assistant familial',
+  'settings.persona.templates.family.desc': 'Chaleureux, amical, adapté à tous les âges',
   'settings.persona.appearanceHeading': 'Avatar et Voix',
   'settings.persona.appearanceDesc':
     "La couleur de la mascotte, l'avatar personnalisé GIF et la voix de réponse sont configurés dans les paramètres de la mascotte.",

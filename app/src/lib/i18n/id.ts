@@ -5061,6 +5061,39 @@ const messages: TranslationMap = {
   'settings.persona.soul.loadError': 'Tidak dapat memuat SOUL.md',
   'settings.persona.soul.saveError': 'Tidak dapat menyimpan SOUL.md',
   'settings.persona.soul.resetError': 'Tidak dapat mereset SOUL.md',
+  'settings.persona.builder.modeLabel': 'Mode editor persona',
+  'settings.persona.builder.modeGuided': 'Terpandu',
+  'settings.persona.builder.modeAdvanced': 'Lanjutan',
+  'settings.persona.builder.intro':
+    'Isi beberapa kolom dan kami menuliskannya ke persona Anda. Tanpa markdown.',
+  'settings.persona.builder.personalityLabel': 'Kepribadian',
+  'settings.persona.builder.personalityPlaceholder':
+    'mis. Hangat, ingin tahu, dan langsung. Jujur soal ketidakpastian.',
+  'settings.persona.builder.voiceLabel': 'Gaya komunikasi',
+  'settings.persona.builder.voicePlaceholder':
+    'mis. Mulai dari jawaban, singkat, dan sesuaikan dengan nada saya.',
+  'settings.persona.builder.aboutLabel': 'Tentang Anda',
+  'settings.persona.builder.aboutPlaceholder':
+    'mis. Saya menjalankan studio desain kecil dan lebih suka bahasa yang sederhana.',
+  'settings.persona.builder.preservedNote':
+    'Bagian lain yang Anda tulis sendiri tetap disimpan — beralih ke Lanjutan untuk melihat persona lengkap.',
+  'settings.persona.builder.securityNote': 'Ingin memilih apa yang boleh dilakukan asisten?',
+  'settings.persona.builder.securityLink': 'Buka Akses agen',
+  'settings.persona.templates.heading': 'Mulai dari templat',
+  'settings.persona.templates.desc':
+    'Pilih titik awal — mengisi Kepribadian dan Gaya komunikasi. Anda bisa mengedit semuanya setelahnya.',
+  'settings.persona.templates.doctor.label': 'Asisten klinis',
+  'settings.persona.templates.doctor.desc': 'Cermat, menyebut sumber, menandai ketidakpastian',
+  'settings.persona.templates.researcher.label': 'Asisten riset',
+  'settings.persona.templates.researcher.desc': 'Teliti, terstruktur, berbasis bukti',
+  'settings.persona.templates.executive.label': 'Asisten eksekutif',
+  'settings.persona.templates.executive.desc': 'Ringkas, tegas, berorientasi tindakan',
+  'settings.persona.templates.teacher.label': 'Guru',
+  'settings.persona.templates.teacher.desc': 'Sabar, menjelaskan langkah demi langkah',
+  'settings.persona.templates.student.label': 'Teman belajar',
+  'settings.persona.templates.student.desc': 'Menyemangati, memberi kuis, bahasa sederhana',
+  'settings.persona.templates.family.label': 'Asisten keluarga',
+  'settings.persona.templates.family.desc': 'Hangat, ramah, aman untuk segala usia',
   'settings.persona.appearanceHeading': 'Avatar & Suara',
   'settings.persona.appearanceDesc':
     'Warna Mascot, avatar GIF kustom, dan suara balasan dikonfigurasi dalam pengaturan Mascot.',
