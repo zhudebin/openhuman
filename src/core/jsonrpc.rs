@@ -62,7 +62,7 @@ pub async fn rpc_handler(State(state): State<AppState>, Json(req): Json<RpcReque
             // `StructuredRpcError` from their handlers — this layer never
             // branches on the RPC method name to recover error semantics.
             let structured = StructuredRpcError::decode(&raw_message);
-            let (display_message, error_data, expected_user_state) = match structured {
+            let (mut display_message, error_data, expected_user_state) = match structured {
                 Some(envelope) => (
                     envelope.message,
                     envelope.data,
@@ -121,6 +121,29 @@ pub async fn rpc_handler(State(state): State<AppState>, Json(req): Json<RpcReque
                 );
             } else if is_session_expired_error(&display_message) {
                 tracing::info!("[rpc] {} -> err ({}ms): {}", method, ms, display_message);
+            } else if crate::core::observability::is_suppressed_usage_probe_backoff(
+                &display_message,
+            ) {
+                // A `/teams/me/usage` probe that the failure-backoff in
+                // `team::ops` short-circuited within its window — i.e. an
+                // already-reported repeat. The FIRST failure of the streak
+                // already hit the backend and reported here normally; demoting
+                // the repeats is exactly the flood control GH #4153 asks for
+                // (backpressure, not silent drop). Debug-only, never Sentry.
+                tracing::debug!(
+                    method = %method,
+                    elapsed_ms = ms as u64,
+                    "[rpc] usage-probe failure-backoff repeat — not reporting to Sentry"
+                );
+                // Keep the internal demotion marker strictly out-of-band: it
+                // exists only to drive the Sentry-demotion decision above and
+                // must never reach the RPC client as the error message. Replace
+                // it with a clean, user-presentable string before the response
+                // is built below (CodeRabbit on #4153 — don't leak the sentinel).
+                display_message =
+                    "Usage temporarily unavailable — the last fetch failed and is backing off; \
+                     it will refresh shortly."
+                        .to_string();
             } else if crate::core::observability::is_transient_message_failure(&display_message) {
                 // Downstream call (backend_api / integrations / provider) already
                 // demoted the underlying transient failure to a warn. The error
