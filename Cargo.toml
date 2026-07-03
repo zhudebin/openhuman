@@ -44,7 +44,7 @@ tinyplace = "1.0.1"
 # run on tinyagents). Powers the "Workflows" feature via the seam in
 # `src/openhuman/tinyflows/` + the `flows::` domain. Pulls tinyagents 1.3 transitively
 # (same version openhuman already uses — no conflict). Published on crates.io.
-tinyflows = "0.2"
+tinyflows = "0.3"
 # TinyAgents — Rust LLM orchestration framework (LangGraph/LangChain-style):
 # durable state graphs, agent-loop harness, model/tool registries, REPL +
 # `.rag` workflow language. openhuman's agent engine + orchestration run on this

@@ -23,4 +23,4 @@ pub use schemas::{
 // them to implement `tinyflows::caps::StateStore` without duplicating the
 // `flow_state` table's persistence logic.
 pub use store::{kv_get, kv_set};
-pub use types::Flow;
+pub use types::{Flow, FlowRun, FlowRunStep};

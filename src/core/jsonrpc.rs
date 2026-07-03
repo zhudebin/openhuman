@@ -2115,6 +2115,17 @@ async fn run_server_inner(
                 {
                     log::warn!("[cron] boot seed of proactive agent jobs failed: {e}");
                 }
+                // Re-register the cron job for every enabled, schedule-trigger
+                // flow (issue B2) — idempotent, so a flow whose binding
+                // predates this feature (or was otherwise lost) gets its
+                // schedule re-registered without the user re-toggling it.
+                if let Err(e) =
+                    crate::openhuman::flows::ops::reconcile_schedule_triggers_on_boot(&config).await
+                {
+                    log::warn!(
+                        "[flows] boot reconciliation of schedule-trigger cron jobs failed: {e}"
+                    );
+                }
                 if let Err(e) = crate::openhuman::cron::scheduler::run(config).await {
                     log::error!("[cron] scheduler loop ended with error: {e}");
                 }
@@ -2220,6 +2231,20 @@ fn register_domain_subscribers(
             std::mem::forget(handle);
         } else {
             log::warn!("[event_bus] failed to register channel subscriber — bus not initialized");
+        }
+
+        // Flows trigger dispatch (issue B2): maps FlowScheduleTick /
+        // ComposioTriggerReceived / WebhookIncomingRequest onto enabled flows and
+        // runs `flows::ops::flows_run`. Registered here (unconditional core boot,
+        // Once-guarded) rather than under channel startup, so schedule/app-event
+        // workflows still dispatch when no realtime channel is configured or
+        // `OPENHUMAN_DISABLE_CHANNEL_LISTENERS` short-circuits `start_channels`.
+        if let Some(handle) = crate::core::event_bus::subscribe_global(Arc::new(
+            crate::openhuman::flows::bus::FlowTriggerSubscriber::new(Arc::new(config.clone())),
+        )) {
+            std::mem::forget(handle);
+        } else {
+            log::warn!("[event_bus] failed to register flows trigger subscriber — bus not initialized");
         }
 
         crate::openhuman::health::bus::register_health_subscriber();

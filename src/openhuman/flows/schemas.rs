@@ -32,6 +32,39 @@ fn flow_output() -> FieldSchema {
     }
 }
 
+fn require_approval_input() -> FieldSchema {
+    FieldSchema {
+        name: "require_approval",
+        ty: TypeSchema::Option(Box::new(TypeSchema::Bool)),
+        comment: "Force a human-approval gate on every outbound tool/HTTP action this flow \
+                  takes, regardless of its saved-flow trust root. Defaults to `false`.",
+        required: false,
+    }
+}
+
+fn run_output_fields() -> Vec<FieldSchema> {
+    vec![
+        FieldSchema {
+            name: "output",
+            ty: TypeSchema::Json,
+            comment: "The run's final state (per-node items, trigger payload).",
+            required: true,
+        },
+        FieldSchema {
+            name: "pending_approvals",
+            ty: TypeSchema::Array(Box::new(TypeSchema::String)),
+            comment: "Node ids paused awaiting human approval; empty once completed.",
+            required: true,
+        },
+        FieldSchema {
+            name: "thread_id",
+            ty: TypeSchema::String,
+            comment: "Durable checkpoint thread id for this run (needed to resume).",
+            required: true,
+        },
+    ]
+}
+
 pub fn all_controller_schemas() -> Vec<ControllerSchema> {
     vec![
         schemas("create"),
@@ -41,6 +74,9 @@ pub fn all_controller_schemas() -> Vec<ControllerSchema> {
         schemas("delete"),
         schemas("set_enabled"),
         schemas("run"),
+        schemas("resume"),
+        schemas("list_runs"),
+        schemas("get_run"),
     ]
 }
 
@@ -74,6 +110,18 @@ pub fn all_registered_controllers() -> Vec<RegisteredController> {
             schema: schemas("run"),
             handler: handle_run,
         },
+        RegisteredController {
+            schema: schemas("resume"),
+            handler: handle_resume,
+        },
+        RegisteredController {
+            schema: schemas("list_runs"),
+            handler: handle_list_runs,
+        },
+        RegisteredController {
+            schema: schemas("get_run"),
+            handler: handle_get_run,
+        },
     ]
 }
 
@@ -97,6 +145,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
                         "A tinyflows WorkflowGraph (nodes + edges); validated and migrated on save.",
                     required: true,
                 },
+                require_approval_input(),
             ],
             outputs: vec![flow_output()],
         },
@@ -137,6 +186,7 @@ pub fn schemas(function: &str) -> ControllerSchema {
                     comment: "Replacement WorkflowGraph, if changing it.",
                     required: false,
                 },
+                require_approval_input(),
             ],
             outputs: vec![flow_output()],
         },
@@ -199,30 +249,78 @@ pub fn schemas(function: &str) -> ControllerSchema {
             outputs: vec![FieldSchema {
                 name: "result",
                 ty: TypeSchema::Object {
-                    fields: vec![
-                        FieldSchema {
-                            name: "output",
-                            ty: TypeSchema::Json,
-                            comment: "The run's final state (per-node items, trigger payload).",
-                            required: true,
-                        },
-                        FieldSchema {
-                            name: "pending_approvals",
-                            ty: TypeSchema::Array(Box::new(TypeSchema::String)),
-                            comment:
-                                "Node ids paused awaiting human approval; empty once completed.",
-                            required: true,
-                        },
-                        FieldSchema {
-                            name: "thread_id",
-                            ty: TypeSchema::String,
-                            comment:
-                                "Durable checkpoint thread id for this run (needed to resume).",
-                            required: true,
-                        },
-                    ],
+                    fields: run_output_fields(),
                 },
                 comment: "Run outcome payload.",
+                required: true,
+            }],
+        },
+        "resume" => ControllerSchema {
+            namespace: "flows",
+            function: "resume",
+            description: "Resume a flow run paused at a human-in-the-loop approval gate, \
+                           continuing from its durable checkpoint.",
+            inputs: vec![
+                id_input("Identifier of the flow to resume."),
+                FieldSchema {
+                    name: "thread_id",
+                    ty: TypeSchema::String,
+                    comment:
+                        "The checkpoint thread id returned by `flows_run` / a prior `flows_resume`.",
+                    required: true,
+                },
+                FieldSchema {
+                    name: "approvals",
+                    ty: TypeSchema::Option(Box::new(TypeSchema::Array(Box::new(
+                        TypeSchema::String,
+                    )))),
+                    comment: "Node ids being approved; defaults to an empty list.",
+                    required: false,
+                },
+            ],
+            outputs: vec![FieldSchema {
+                name: "result",
+                ty: TypeSchema::Object {
+                    fields: run_output_fields(),
+                },
+                comment: "Resume outcome payload (same shape as `run`'s).",
+                required: true,
+            }],
+        },
+        "list_runs" => ControllerSchema {
+            namespace: "flows",
+            function: "list_runs",
+            description: "List the most recent runs for a flow, newest first.",
+            inputs: vec![
+                id_input("Identifier of the flow whose runs to list."),
+                FieldSchema {
+                    name: "limit",
+                    ty: TypeSchema::Option(Box::new(TypeSchema::U64)),
+                    comment: "Maximum number of runs to return; defaults to 20.",
+                    required: false,
+                },
+            ],
+            outputs: vec![FieldSchema {
+                name: "runs",
+                ty: TypeSchema::Array(Box::new(TypeSchema::Ref("FlowRun"))),
+                comment: "Persisted run records for this flow, newest first.",
+                required: true,
+            }],
+        },
+        "get_run" => ControllerSchema {
+            namespace: "flows",
+            function: "get_run",
+            description: "Load one persisted flow run record by its (checkpoint thread) id.",
+            inputs: vec![FieldSchema {
+                name: "run_id",
+                ty: TypeSchema::String,
+                comment: "Identifier of the run to load (== its checkpoint thread id).",
+                required: true,
+            }],
+            outputs: vec![FieldSchema {
+                name: "run",
+                ty: TypeSchema::Ref("FlowRun"),
+                comment: "The persisted run record.",
                 required: true,
             }],
         },
@@ -251,7 +349,11 @@ fn handle_create(params: Map<String, Value>) -> ControllerFuture {
         let config = config_rpc::load_config_with_timeout().await?;
         let name = read_required::<String>(&params, "name")?;
         let graph = read_required::<Value>(&params, "graph")?;
-        to_json(ops::flows_create(&config, name, graph).await?)
+        let require_approval = params
+            .get("require_approval")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        to_json(ops::flows_create(&config, name, graph, require_approval).await?)
     })
 }
 
@@ -281,7 +383,8 @@ fn handle_update(params: Map<String, Value>) -> ControllerFuture {
             .transpose()
             .map_err(|e| format!("invalid 'name': {e}"))?;
         let graph = params.get("graph").filter(|v| !v.is_null()).cloned();
-        to_json(ops::flows_update(&config, id.trim(), name, graph).await?)
+        let require_approval = params.get("require_approval").and_then(Value::as_bool);
+        to_json(ops::flows_update(&config, id.trim(), name, graph, require_approval).await?)
     })
 }
 
@@ -311,6 +414,44 @@ fn handle_run(params: Map<String, Value>) -> ControllerFuture {
         let id = read_required::<String>(&params, "id")?;
         let input = params.get("input").cloned().unwrap_or(Value::Null);
         to_json(ops::flows_run(&config, id.trim(), input).await?)
+    })
+}
+
+fn handle_resume(params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
+        let config = config_rpc::load_config_with_timeout().await?;
+        let id = read_required::<String>(&params, "id")?;
+        let thread_id = read_required::<String>(&params, "thread_id")?;
+        let approvals: Vec<String> = params
+            .get("approvals")
+            .filter(|v| !v.is_null())
+            .cloned()
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|e| format!("invalid 'approvals': {e}"))?
+            .unwrap_or_default();
+        to_json(ops::flows_resume(&config, id.trim(), thread_id.trim(), approvals).await?)
+    })
+}
+
+fn handle_list_runs(params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
+        let config = config_rpc::load_config_with_timeout().await?;
+        let id = read_required::<String>(&params, "id")?;
+        let limit = params
+            .get("limit")
+            .and_then(Value::as_u64)
+            .and_then(|n| usize::try_from(n).ok())
+            .unwrap_or(20);
+        to_json(ops::flows_list_runs(&config, id.trim(), limit).await?)
+    })
+}
+
+fn handle_get_run(params: Map<String, Value>) -> ControllerFuture {
+    Box::pin(async move {
+        let config = config_rpc::load_config_with_timeout().await?;
+        let run_id = read_required::<String>(&params, "run_id")?;
+        to_json(ops::flows_get_run(&config, run_id.trim()).await?)
     })
 }
 
@@ -345,7 +486,10 @@ mod tests {
                 "update",
                 "delete",
                 "set_enabled",
-                "run"
+                "run",
+                "resume",
+                "list_runs",
+                "get_run",
             ]
         );
     }
@@ -353,7 +497,7 @@ mod tests {
     #[test]
     fn all_registered_controllers_has_handler_per_schema() {
         let controllers = all_registered_controllers();
-        assert_eq!(controllers.len(), 7);
+        assert_eq!(controllers.len(), 10);
         let names: Vec<_> = controllers.iter().map(|c| c.schema.function).collect();
         assert_eq!(
             names,
@@ -364,7 +508,10 @@ mod tests {
                 "update",
                 "delete",
                 "set_enabled",
-                "run"
+                "run",
+                "resume",
+                "list_runs",
+                "get_run",
             ]
         );
     }
@@ -383,10 +530,54 @@ mod tests {
     }
 
     #[test]
+    fn schemas_create_require_approval_is_optional() {
+        let s = schemas("create");
+        let field = s
+            .inputs
+            .iter()
+            .find(|f| f.name == "require_approval")
+            .unwrap();
+        assert!(!field.required);
+    }
+
+    #[test]
     fn schemas_run_input_is_optional() {
         let s = schemas("run");
         let input = s.inputs.iter().find(|f| f.name == "input").unwrap();
         assert!(!input.required);
+    }
+
+    #[test]
+    fn schemas_resume_requires_id_and_thread_id_but_not_approvals() {
+        let s = schemas("resume");
+        let required: Vec<_> = s
+            .inputs
+            .iter()
+            .filter(|f| f.required)
+            .map(|f| f.name)
+            .collect();
+        assert_eq!(required, vec!["id", "thread_id"]);
+        let approvals = s.inputs.iter().find(|f| f.name == "approvals").unwrap();
+        assert!(!approvals.required);
+    }
+
+    #[test]
+    fn schemas_list_runs_limit_is_optional() {
+        let s = schemas("list_runs");
+        let limit = s.inputs.iter().find(|f| f.name == "limit").unwrap();
+        assert!(!limit.required);
+    }
+
+    #[test]
+    fn schemas_get_run_requires_run_id() {
+        let s = schemas("get_run");
+        let required: Vec<_> = s
+            .inputs
+            .iter()
+            .filter(|f| f.required)
+            .map(|f| f.name)
+            .collect();
+        assert_eq!(required, vec!["run_id"]);
     }
 
     #[test]

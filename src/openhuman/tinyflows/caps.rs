@@ -141,14 +141,130 @@ impl LlmProvider for OpenHumanLlm {
     }
 }
 
+/// Parses a `"composio:<toolkit>:<connection_id>"` `connection_ref` (see the
+/// node catalog, `my_docs/ohxtf/commons/12-node-catalog-0.2.md`) and returns
+/// the trailing connection id segment. Values that don't match this shape
+/// return `None` — the caller logs and falls back to the ambient session
+/// account (only Direct mode can actually forward the id today; see
+/// [`OpenHumanTools::invoke`]'s doc for the Backend-mode gap this leaves
+/// open).
+pub(crate) fn composio_connection_id(conn: &str) -> Option<&str> {
+    let rest = conn.strip_prefix("composio:")?;
+    let id = rest.rsplit(':').next()?;
+    (!id.is_empty()).then_some(id)
+}
+
+/// Parses a `"http_cred:<name>"` `connection_ref` for [`OpenHumanHttp`]. No
+/// host-side HTTP credential store exists yet — this only extracts the name
+/// so the adapter can log a clear, actionable warning instead of silently
+/// ignoring the reference. See [`OpenHumanHttp::request`]'s doc.
+pub(crate) fn http_cred_name(conn: &str) -> Option<&str> {
+    let name = conn.strip_prefix("http_cred:")?.trim();
+    (!name.is_empty()).then_some(name)
+}
+
+/// Strict, deny-by-default curation check for flow `tool_call` nodes (issue
+/// B2 finding #2).
+///
+/// This is intentionally **stricter** than
+/// `memory_sync::composio::providers::is_action_visible_with_pref` — the
+/// helper the normal agent tool-call loop uses. That helper is permissive by
+/// design for a toolkit it doesn't recognize: it falls back to the
+/// `classify_unknown` heuristic and lets the slug through (scope-gated), and
+/// treats a prefix-less slug as unconditionally visible. That's safe in the
+/// agent loop because the model only ever sees slugs the *backend itself*
+/// returned from live tool discovery (`composio_list_tools`) — there is no
+/// path for the model to invent a slug that reaches this check. A flow's
+/// `tool_call.slug`, by contrast, is a free-form string the flow *author*
+/// typed when building the graph; it never round-trips through Composio
+/// discovery before `invoke` is called. So here a slug is allowed **only**
+/// if it resolves to a real, known toolkit AND is present in that toolkit's
+/// curated catalog:
+/// - `toolkit_from_slug` fails to extract anything (empty/blank slug) → reject.
+/// - the extracted toolkit has no registered provider curated list AND no
+///   static `catalog_for_toolkit` entry (i.e. it isn't one of OpenHuman's
+///   known/curated toolkits at all — including a made-up prefix like
+///   `madeupkit`, or a prefix-less slug like `noop` which `toolkit_from_slug`
+///   degrades to treating as its own single-segment "toolkit") → reject.
+/// - the toolkit has a catalog but `slug` isn't one of its entries → reject.
+/// - otherwise, apply the same per-user read/write/admin scope preference
+///   the agent loop uses (`UserScopePref::allows`).
+///
+/// // TODO(0.3): this hard-rejects any *real* Composio toolkit that simply
+/// // isn't in the static `catalog_for_toolkit` map yet (there is no
+/// // host-side, offline way to ask "is this actually a valid Composio
+/// // toolkit/action" beyond the curated catalogs OpenHuman ships). That's
+/// // an accepted trade-off for a genuine allowlist rather than a residual
+/// // gap to silently work around — extending `catalog_for_toolkit` (or, if
+/// // a live catalog lookup becomes available, consulting it here) is how a
+/// // newly-supported toolkit gets flow tool-call support.
+async fn is_curated_flow_tool(slug: &str) -> bool {
+    use crate::openhuman::memory_sync::composio::providers::{
+        catalog_for_toolkit, find_curated, get_provider, load_user_scope_or_default,
+        toolkit_from_slug,
+    };
+
+    let Some(toolkit) = toolkit_from_slug(slug) else {
+        return false;
+    };
+    let catalog = get_provider(&toolkit)
+        .and_then(|p| p.curated_tools())
+        .or_else(|| catalog_for_toolkit(&toolkit));
+    let Some(catalog) = catalog else {
+        return false;
+    };
+    let Some(curated) = find_curated(catalog, slug) else {
+        return false;
+    };
+    let pref = load_user_scope_or_default(&toolkit).await;
+    pref.allows(curated.scope)
+}
+
 /// [`ToolInvoker`] adapter over Composio (`src/openhuman/composio/client.rs`).
 ///
-/// **B1 deviation (tracked, see `my_docs/ohxtf/commons/11-gotchas-and-decisions.md`):**
-/// `connection_ref` is logged but not forwarded — `execute_tool` (backend mode)
-/// takes no connection id and resolves the ambient signed-in account; direct
-/// mode uses `config.composio.entity_id`. Fine for a single-account desktop
-/// user; must be resolved before multi-account or B2 trigger runs. There is
-/// also no curated-tool-set / scope filter yet — `invoke` will call any slug.
+/// **B2 (closes two B1 deviations, see
+/// `my_docs/ohxtf/b2-triggers-trust/01-triggers-and-trust.md` §4-5):**
+/// - **Curation + scope (hard allowlist)**: every call is checked against
+///   [`is_curated_flow_tool`] — a deny-by-default gate that only allows a
+///   slug resolving to a *known, curated* toolkit action, unlike the general
+///   agent tool-call path's more permissive
+///   `memory_sync::composio::providers::is_action_visible_with_pref` (see
+///   [`is_curated_flow_tool`]'s doc for why the two differ). A non-curated /
+///   unrecognized / out-of-scope slug is rejected with
+///   `EngineError::Capability("tool not permitted: <slug>")` before any
+///   Composio call. **As of tinyflows 0.3 this is load-bearing, not merely
+///   defense-in-depth**: integration-node config (including `slug`) is now
+///   `=`-expression evaluated against upstream/trigger data before `invoke`,
+///   so a trigger payload *can* influence which tool a `=`-derived slug
+///   resolves to. The curation gate runs on the **resolved** slug (verified:
+///   a `=item.tool`-derived unknown slug is rejected here before Composio),
+///   constraining any data-derived tool to the user's curated, in-scope,
+///   connected set — and it still closes the case where an author hand-types
+///   an arbitrary/typo'd slug.
+/// - **connection_ref**: `conn` (`"composio:<toolkit>:<connection_id>"`) is
+///   now parsed and forwarded to `direct_execute` (Composio Direct mode).
+///   Backend mode's `execute_tool` still has no per-call account-scoping
+///   path — that's a backend API gap, not something this seam can close
+///   alone — so a `connection_ref` under Backend mode logs a warning and
+///   falls back to the ambient signed-in account (documented stub; see
+///   `composio_connection_id`).
+/// - **Trust gate**: invocation is also routed through the OpenHuman
+///   `ApprovalGate` (mirrors `tinyagents/middleware.rs::ApprovalSecurityMiddleware`)
+///   before dispatch, closing the Codex P1 finding that flow tool nodes
+///   bypassed the Network/tool approval gate entirely. `ops::flows_run` /
+///   `flows_resume` scope a `TrustedAutomation { Workflow }` origin around
+///   the whole run, so the gate either auto-allows (pre-declared trust root)
+///   or — when the flow's `require_approval` is set — parks for a real
+///   decision. No gate installed (unit tests, some hosts) means no gating,
+///   same as the existing agent tool-loop middleware.
+///
+/// // SECURITY NOTE (tinyflows 0.3, now the pinned version): integration nodes
+/// // `=`-resolve config from upstream/trigger data, so a trigger-driven flow
+/// // whose `slug`/`url` is `=`-derived lets untrusted trigger data pick *which*
+/// // curated + in-scope + connected tool/endpoint runs (blast radius bounded by
+/// // the curation + scope + connection checks above and the approval gate).
+/// // For such flows authors should set `require_approval`. FOLLOW-UP: auto-force
+/// // approval when a trigger-driven run's tool/http config contains `=`-exprs.
 pub struct OpenHumanTools {
     pub config: Arc<Config>,
 }
@@ -156,41 +272,110 @@ pub struct OpenHumanTools {
 #[async_trait]
 impl ToolInvoker for OpenHumanTools {
     async fn invoke(&self, slug: &str, args: Value, conn: Option<&str>) -> Result<Value> {
-        if let Some(c) = conn {
-            tracing::debug!(
+        // Curation + scope gate — hard allowlist (see [`is_curated_flow_tool`]'s
+        // doc for why this differs from the general agent tool-call path).
+        // Runs before anything else — a rejected slug never reaches the
+        // composio client at all.
+        if !is_curated_flow_tool(slug).await {
+            tracing::warn!(
                 target: "flows",
                 %slug,
-                conn = %c,
-                "[flows] tool conn (backend resolves ambient account; not forwarded in B1)"
+                "[flows] tool_call: rejected — not a recognized curated toolkit action, or out \
+                 of the user's configured scope"
             );
+            return Err(EngineError::Capability(format!(
+                "tool not permitted: {slug}"
+            )));
+        }
+
+        // Approval gate (see the struct doc). Mirrors
+        // `tinyagents/middleware.rs::ApprovalSecurityMiddleware::wrap_tool`'s
+        // shape exactly: compute summary/redacted args only when a gate is
+        // installed, deny short-circuits before any composio call, allow
+        // records an audit id to close out after the call resolves.
+        let mut audit_id: Option<String> = None;
+        if let Some(gate) = crate::openhuman::approval::ApprovalGate::try_global() {
+            let summary = crate::openhuman::approval::summarize_action(slug, &args);
+            let redacted = crate::openhuman::approval::redact_args(&args);
+            let (outcome, request_id) = gate.intercept_audited(slug, &summary, redacted).await;
+            match outcome {
+                crate::openhuman::approval::GateOutcome::Deny { reason } => {
+                    return Err(EngineError::Capability(reason));
+                }
+                crate::openhuman::approval::GateOutcome::Allow => audit_id = request_id,
+            }
         }
 
         let kind = create_composio_client(&self.config)
             .map_err(|e| EngineError::Capability(e.to_string()))?;
         let args_opt = if args.is_null() { None } else { Some(args) };
+        let connection_id = conn.and_then(composio_connection_id);
 
-        tracing::debug!(target: "flows", %slug, mode = kind.mode(), "[flows] tool_call: invoking composio tool");
+        tracing::debug!(
+            target: "flows",
+            %slug,
+            mode = kind.mode(),
+            has_connection_ref = connection_id.is_some(),
+            "[flows] tool_call: invoking composio tool"
+        );
 
         let response = match kind {
-            ComposioClientKind::Backend(client) => client
-                .execute_tool(slug, args_opt)
-                .await
-                .map_err(|e| EngineError::Capability(e.to_string()))?,
-            ComposioClientKind::Direct(tool) => {
-                direct_execute(&tool, slug, args_opt, &self.config.composio.entity_id, None)
+            ComposioClientKind::Backend(client) => {
+                if connection_id.is_some() {
+                    tracing::warn!(
+                        target: "flows",
+                        %slug,
+                        "[flows] tool_call: connection_ref set but backend mode has no per-call \
+                         account-scoping path yet — using the ambient session account \
+                         (documented stub, see caps.rs's OpenHumanTools doc)"
+                    );
+                }
+                client
+                    .execute_tool(slug, args_opt)
                     .await
-                    .map_err(|e| EngineError::Capability(e.to_string()))?
+                    .map_err(|e| EngineError::Capability(e.to_string()))
             }
+            ComposioClientKind::Direct(tool) => direct_execute(
+                &tool,
+                slug,
+                args_opt,
+                &self.config.composio.entity_id,
+                connection_id,
+            )
+            .await
+            .map_err(|e| EngineError::Capability(e.to_string())),
         };
 
-        serde_json::to_value(response).map_err(|e| EngineError::Capability(e.to_string()))
+        if let Some(id) = audit_id {
+            if let Some(gate) = crate::openhuman::approval::ApprovalGate::try_global() {
+                let exec = if response.is_ok() {
+                    crate::openhuman::approval::ExecutionOutcome::Success
+                } else {
+                    crate::openhuman::approval::ExecutionOutcome::Failure
+                };
+                gate.record_execution(
+                    &id,
+                    exec,
+                    response.as_ref().err().map(ToString::to_string).as_deref(),
+                );
+            }
+        }
+
+        serde_json::to_value(response?).map_err(|e| EngineError::Capability(e.to_string()))
     }
 }
 
 /// [`HttpClient`] adapter over `HttpRequestTool`
 /// (`src/openhuman/tools/impl/network/http_request.rs`). Allowlist + DNS-rebind
-/// guard + Network gating live inside `execute`, so this adapter gets them for
-/// free.
+/// guard live inside `execute`, so this adapter gets them for free.
+///
+/// **B2:** also routes through the OpenHuman `ApprovalGate` before dispatch
+/// (same rationale/shape as [`OpenHumanTools::invoke`] — closes the Codex P1
+/// finding that flow HTTP nodes bypassed the Network approval gate). A
+/// `"http_cred:<name>"` `connection_ref` is parsed but there is no HTTP
+/// credential store to resolve it against yet (documented stub, see
+/// `http_cred_name`) — the request proceeds without injecting stored
+/// credentials.
 pub struct OpenHumanHttp {
     pub security: Arc<SecurityPolicy>,
     pub http_config: HttpRequestConfig,
@@ -199,8 +384,31 @@ pub struct OpenHumanHttp {
 #[async_trait]
 impl HttpClient for OpenHumanHttp {
     async fn request(&self, request: Value, conn: Option<&str>) -> Result<Value> {
-        if let Some(c) = conn {
-            tracing::debug!(target: "flows", conn = %c, "[flows] http conn (not resolved in B1)");
+        const TOOL_NAME: &str = "flows_http_request";
+
+        let mut audit_id: Option<String> = None;
+        if let Some(gate) = crate::openhuman::approval::ApprovalGate::try_global() {
+            let summary = crate::openhuman::approval::summarize_action(TOOL_NAME, &request);
+            let redacted = crate::openhuman::approval::redact_args(&request);
+            let (outcome, request_id) = gate.intercept_audited(TOOL_NAME, &summary, redacted).await;
+            match outcome {
+                crate::openhuman::approval::GateOutcome::Deny { reason } => {
+                    return Err(EngineError::Capability(reason));
+                }
+                crate::openhuman::approval::GateOutcome::Allow => audit_id = request_id,
+            }
+        }
+
+        if let Some(name) = conn.and_then(http_cred_name) {
+            tracing::warn!(
+                target: "flows",
+                cred = %name,
+                "[flows] http_request: connection_ref names an http_cred secret, but no HTTP \
+                 credential store exists yet — proceeding WITHOUT injecting stored credentials \
+                 (documented stub, see caps.rs's OpenHumanHttp doc)"
+            );
+        } else if let Some(c) = conn {
+            tracing::debug!(target: "flows", conn = %c, "[flows] http conn: unrecognized connection_ref prefix (expected `http_cred:<name>`) — ignoring");
         }
 
         let tool = HttpRequestTool::new(
@@ -221,20 +429,36 @@ impl HttpClient for OpenHumanHttp {
         // config is the request descriptor; `HttpRequestTool::execute` reads
         // only those keys and ignores the rest (e.g. `connection_ref`,
         // `on_error`), so passing the whole config through is safe.
-        let result = tool
-            .execute(request)
-            .await
-            .map_err(|e| EngineError::Capability(e.to_string()))?;
+        let result = tool.execute(request).await;
 
-        // `HttpRequestTool::execute` always returns `Ok`, using `is_error` to
-        // signal a failed request (non-2xx, DNS/allowlist rejection, timeout,
-        // …) — surface that as a capability error so the engine's
-        // `on_error`/`retry` policy can act on it.
-        if result.is_error {
-            return Err(EngineError::Capability(result.text()));
+        let outcome: Result<Value> = match result {
+            Ok(result) if result.is_error => {
+                // `HttpRequestTool::execute` always returns `Ok`, using
+                // `is_error` to signal a failed request (non-2xx, DNS/allowlist
+                // rejection, timeout, …) — surface that as a capability error
+                // so the engine's `on_error`/`retry` policy can act on it.
+                Err(EngineError::Capability(result.text()))
+            }
+            Ok(result) => Ok(json!({ "text": result.text() })),
+            Err(e) => Err(EngineError::Capability(e.to_string())),
+        };
+
+        if let Some(id) = audit_id {
+            if let Some(gate) = crate::openhuman::approval::ApprovalGate::try_global() {
+                let exec = if outcome.is_ok() {
+                    crate::openhuman::approval::ExecutionOutcome::Success
+                } else {
+                    crate::openhuman::approval::ExecutionOutcome::Failure
+                };
+                gate.record_execution(
+                    &id,
+                    exec,
+                    outcome.as_ref().err().map(ToString::to_string).as_deref(),
+                );
+            }
         }
 
-        Ok(json!({ "text": result.text() }))
+        outcome
     }
 }
 

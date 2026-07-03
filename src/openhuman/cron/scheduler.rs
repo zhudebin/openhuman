@@ -453,6 +453,10 @@ async fn execute_job_with_retry(
                 (success, output, None)
             }
             JobType::Agent => run_agent_job(config, job).await,
+            JobType::Flow => {
+                let (success, output) = run_flow_schedule_job(job);
+                (success, output, None)
+            }
         };
         last_output = output;
         if agent_error.is_some() {
@@ -888,6 +892,29 @@ async fn run_agent_job(config: &Config, job: &CronJob) -> (bool, String, Option<
             (false, user_message.to_string(), Some(e.to_string()))
         }
     }
+}
+
+/// Fires a `JobType::Flow` job: publishes `DomainEvent::FlowScheduleTick` for
+/// the bound flow id (stored in `job.command`, see `JobType::Flow`'s doc) and
+/// returns immediately. This job type does no work itself — dispatching the
+/// actual `flows::ops::flows_run` happens asynchronously in
+/// `flows::bus::FlowTriggerSubscriber`, which is the sole consumer of this
+/// event (kept out of the cron domain so cron stays flow-agnostic).
+fn run_flow_schedule_job(job: &CronJob) -> (bool, String) {
+    let flow_id = job.command.clone();
+    tracing::info!(
+        target: "flows",
+        job_id = %job.id,
+        %flow_id,
+        "[cron] flow schedule tick — publishing FlowScheduleTick"
+    );
+    publish_global(DomainEvent::FlowScheduleTick {
+        flow_id: flow_id.clone(),
+    });
+    (
+        true,
+        format!("flow schedule tick emitted for flow {flow_id}"),
+    )
 }
 
 /// Placeholder recorded in run history when an agent job succeeds but returns

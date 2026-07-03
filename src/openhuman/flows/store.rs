@@ -15,6 +15,7 @@
 //! `checkpoints.db` (see `src/openhuman/tinyflows/mod.rs::open_flow_checkpointer`).
 
 use crate::openhuman::config::Config;
+use crate::openhuman::flows::types::{FlowRun, FlowRunStep};
 use crate::openhuman::flows::Flow;
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -59,14 +60,78 @@ fn with_connection<T>(config: &Config, f: impl FnOnce(&Connection) -> Result<T>)
             key       TEXT NOT NULL,
             value     TEXT NOT NULL,
             PRIMARY KEY (namespace, key)
-         );",
+         );
+
+         CREATE TABLE IF NOT EXISTS flow_runs (
+            id                      TEXT PRIMARY KEY,
+            flow_id                 TEXT NOT NULL,
+            thread_id               TEXT NOT NULL,
+            status                  TEXT NOT NULL,
+            started_at              TEXT NOT NULL,
+            finished_at             TEXT,
+            steps_json              TEXT NOT NULL DEFAULT '[]',
+            pending_approvals_json  TEXT NOT NULL DEFAULT '[]',
+            error                   TEXT,
+            FOREIGN KEY (flow_id) REFERENCES flow_definitions(id) ON DELETE CASCADE
+         );
+         CREATE INDEX IF NOT EXISTS idx_flow_runs_flow_id ON flow_runs(flow_id);
+         CREATE INDEX IF NOT EXISTS idx_flow_runs_started_at ON flow_runs(started_at);",
     )
     .context("Failed to initialize flows schema")?;
+
+    // `require_approval` (issue B2) — added post-hoc so a workspace created
+    // before this column existed still opens cleanly. Mirrors
+    // `cron::store`'s `add_column_if_missing` idiom.
+    add_column_if_missing(
+        &conn,
+        "flow_definitions",
+        "require_approval",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
 
     tracing::debug!(db = %db_path.display(), "[flows] store opened");
 
     f(&conn)
 }
+
+/// Adds `name` to `table` if it isn't already present, tolerating the race
+/// where a concurrent process adds the same column between the `PRAGMA`
+/// check and the `ALTER TABLE`. Mirrors `cron::store::add_column_if_missing`
+/// (kept per-domain rather than shared — each store owns its own connection
+/// helper and this is a handful of lines).
+fn add_column_if_missing(conn: &Connection, table: &str, name: &str, sql_type: &str) -> Result<()> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let mut rows = stmt.query([])?;
+    while let Some(row) = rows.next()? {
+        let col_name: String = row.get(1)?;
+        if col_name == name {
+            return Ok(());
+        }
+    }
+    drop(rows);
+    drop(stmt);
+
+    match conn.execute(
+        &format!("ALTER TABLE {table} ADD COLUMN {name} {sql_type}"),
+        [],
+    ) {
+        Ok(_) => Ok(()),
+        Err(rusqlite::Error::SqliteFailure(err, Some(ref msg)))
+            if msg.contains("duplicate column name") =>
+        {
+            tracing::debug!(
+                "[flows] column {table}.{name} already exists (concurrent migration): {err}"
+            );
+            Ok(())
+        }
+        Err(e) => Err(e).with_context(|| format!("Failed to add {table}.{name}")),
+    }
+}
+
+/// Shared column list for every `flow_definitions` SELECT — keeps
+/// [`map_flow_row`]'s positional `row.get(N)` calls in sync with the query.
+const FLOW_DEFINITION_COLUMNS: &str = "id, name, graph_json, enabled, created_at, updated_at, \
+     last_run_at, last_status, require_approval";
 
 /// Inserts or fully replaces a flow definition row.
 pub fn upsert_flow(config: &Config, flow: &Flow) -> Result<()> {
@@ -74,15 +139,16 @@ pub fn upsert_flow(config: &Config, flow: &Flow) -> Result<()> {
     with_connection(config, |conn| {
         conn.execute(
             "INSERT INTO flow_definitions
-                (id, name, graph_json, enabled, created_at, updated_at, last_run_at, last_status)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                (id, name, graph_json, enabled, created_at, updated_at, last_run_at, last_status, require_approval)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
              ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 graph_json = excluded.graph_json,
                 enabled = excluded.enabled,
                 updated_at = excluded.updated_at,
                 last_run_at = excluded.last_run_at,
-                last_status = excluded.last_status",
+                last_status = excluded.last_status,
+                require_approval = excluded.require_approval",
             params![
                 flow.id,
                 flow.name,
@@ -92,6 +158,7 @@ pub fn upsert_flow(config: &Config, flow: &Flow) -> Result<()> {
                 flow.updated_at,
                 flow.last_run_at,
                 flow.last_status,
+                if flow.require_approval { 1 } else { 0 },
             ],
         )
         .context("Failed to upsert flow definition")?;
@@ -106,6 +173,7 @@ pub fn create_flow(
     config: &Config,
     name: String,
     graph: tinyflows::model::WorkflowGraph,
+    require_approval: bool,
 ) -> Result<Flow> {
     let now = Utc::now().to_rfc3339();
     let flow = Flow {
@@ -117,6 +185,7 @@ pub fn create_flow(
         updated_at: now,
         last_run_at: None,
         last_status: None,
+        require_approval,
     };
     upsert_flow(config, &flow)?;
     Ok(flow)
@@ -127,10 +196,9 @@ pub fn create_flow(
 /// under an older `schema_version` is upgraded on read.
 pub fn get_flow(config: &Config, id: &str) -> Result<Option<Flow>> {
     with_connection(config, |conn| {
-        let mut stmt = conn.prepare(
-            "SELECT id, name, graph_json, enabled, created_at, updated_at, last_run_at, last_status
-             FROM flow_definitions WHERE id = ?1",
-        )?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {FLOW_DEFINITION_COLUMNS} FROM flow_definitions WHERE id = ?1"
+        ))?;
         let mut rows = stmt.query(params![id])?;
         match rows.next()? {
             Some(row) => Ok(Some(map_flow_row(row)?)),
@@ -142,10 +210,31 @@ pub fn get_flow(config: &Config, id: &str) -> Result<Option<Flow>> {
 /// Lists all saved flows, migrating each graph on read (see [`get_flow`]).
 pub fn list_flows(config: &Config) -> Result<Vec<Flow>> {
     with_connection(config, |conn| {
-        let mut stmt = conn.prepare(
-            "SELECT id, name, graph_json, enabled, created_at, updated_at, last_run_at, last_status
-             FROM flow_definitions ORDER BY created_at ASC",
-        )?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {FLOW_DEFINITION_COLUMNS} FROM flow_definitions ORDER BY created_at ASC"
+        ))?;
+        let rows = stmt.query_map([], map_flow_row)?;
+        let mut flows = Vec::new();
+        for row in rows {
+            flows.push(row?);
+        }
+        Ok(flows)
+    })
+}
+
+/// Lists only enabled flows, migrating each graph on read (see [`get_flow`]).
+///
+/// Used by `flows::bus::FlowTriggerSubscriber` to match an inbound
+/// `ComposioTriggerReceived` event against every enabled `app_event` flow —
+/// scanning the (small) enabled set once per event is simpler and cheap
+/// enough at expected flow counts; a dedicated toolkit/trigger_slug index is
+/// a later optimization if this ever shows up as a bottleneck.
+pub fn list_enabled_flows(config: &Config) -> Result<Vec<Flow>> {
+    with_connection(config, |conn| {
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {FLOW_DEFINITION_COLUMNS} FROM flow_definitions WHERE enabled = 1 \
+             ORDER BY created_at ASC"
+        ))?;
         let rows = stmt.query_map([], map_flow_row)?;
         let mut flows = Vec::new();
         for row in rows {
@@ -185,13 +274,14 @@ pub fn set_enabled(config: &Config, id: &str, enabled: bool) -> Result<Flow> {
     get_flow(config, id)?.ok_or_else(|| anyhow::anyhow!("flow '{id}' not found after update"))
 }
 
-/// Replaces a flow's name/graph (re-validated by the caller before this is
-/// invoked) in place, bumping `updated_at`.
+/// Replaces a flow's name/graph/`require_approval` (re-validated by the
+/// caller before this is invoked) in place, bumping `updated_at`.
 pub fn update_flow_graph(
     config: &Config,
     id: &str,
     name: String,
     graph: tinyflows::model::WorkflowGraph,
+    require_approval: bool,
 ) -> Result<Flow> {
     let graph_json = serde_json::to_string(&graph).context("Failed to serialize graph")?;
     let now = Utc::now().to_rfc3339();
@@ -200,8 +290,15 @@ pub fn update_flow_graph(
     // `enabled` / `last_run_at` / `last_status` from a read-modify-write.
     let changed = with_connection(config, |conn| {
         conn.execute(
-            "UPDATE flow_definitions SET name = ?1, graph_json = ?2, updated_at = ?3 WHERE id = ?4",
-            params![name, graph_json, now, id],
+            "UPDATE flow_definitions SET name = ?1, graph_json = ?2, updated_at = ?3, \
+             require_approval = ?4 WHERE id = ?5",
+            params![
+                name,
+                graph_json,
+                now,
+                if require_approval { 1 } else { 0 },
+                id
+            ],
         )
         .context("Failed to update flow")
     })?;
@@ -246,6 +343,7 @@ fn map_flow_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Flow> {
         updated_at: row.get(5)?,
         last_run_at: row.get(6)?,
         last_status: row.get(7)?,
+        require_approval: row.get::<_, i64>(8)? != 0,
     })
 }
 
@@ -293,6 +391,113 @@ pub fn kv_set(
         )
         .context("Failed to store flow state value")?;
         Ok(())
+    })
+}
+
+/// Shared column list for every `flow_runs` SELECT — keeps
+/// [`map_flow_run_row`]'s positional `row.get(N)` calls in sync.
+const FLOW_RUN_COLUMNS: &str = "id, flow_id, thread_id, status, started_at, finished_at, \
+     steps_json, pending_approvals_json, error";
+
+/// Inserts the initial `"running"` row for a new `flows_run` / `flows_resume`
+/// invocation. `id` and `thread_id` are the same value in practice (the
+/// tinyflows checkpointer thread id doubles as the run's stable identifier),
+/// kept as two columns because they answer two different questions (row
+/// identity vs. the checkpointer key `flows_resume` needs).
+pub fn insert_flow_run(
+    config: &Config,
+    id: &str,
+    flow_id: &str,
+    thread_id: &str,
+    started_at: &str,
+) -> Result<()> {
+    with_connection(config, |conn| {
+        conn.execute(
+            "INSERT INTO flow_runs (id, flow_id, thread_id, status, started_at)
+             VALUES (?1, ?2, ?3, 'running', ?4)",
+            params![id, flow_id, thread_id, started_at],
+        )
+        .context("Failed to insert flow run")?;
+        Ok(())
+    })
+}
+
+/// Finalizes a flow run row: settles its terminal `status`, `finished_at`,
+/// reconstructed `steps`, `pending_approvals`, and (on failure) `error`.
+/// Called once a `flows_run` / `flows_resume` invocation settles — including
+/// the timeout / capability-error paths, so a row never gets stuck at
+/// `"running"` when the process is still up.
+pub fn finish_flow_run(
+    config: &Config,
+    id: &str,
+    status: &str,
+    finished_at: &str,
+    steps: &[FlowRunStep],
+    pending_approvals: &[String],
+    error: Option<&str>,
+) -> Result<()> {
+    let steps_json = serde_json::to_string(steps).context("Failed to serialize flow run steps")?;
+    let pending_json = serde_json::to_string(pending_approvals)
+        .context("Failed to serialize flow run pending approvals")?;
+    with_connection(config, |conn| {
+        conn.execute(
+            "UPDATE flow_runs SET status = ?1, finished_at = ?2, steps_json = ?3, \
+             pending_approvals_json = ?4, error = ?5 WHERE id = ?6",
+            params![status, finished_at, steps_json, pending_json, error, id],
+        )
+        .context("Failed to finish flow run")?;
+        Ok(())
+    })
+}
+
+/// Loads one flow run by id (== thread_id).
+pub fn get_flow_run(config: &Config, id: &str) -> Result<Option<FlowRun>> {
+    with_connection(config, |conn| {
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {FLOW_RUN_COLUMNS} FROM flow_runs WHERE id = ?1"
+        ))?;
+        let mut rows = stmt.query(params![id])?;
+        match rows.next()? {
+            Some(row) => Ok(Some(map_flow_run_row(row)?)),
+            None => Ok(None),
+        }
+    })
+}
+
+/// Lists the most recent runs for a flow, newest first.
+pub fn list_flow_runs(config: &Config, flow_id: &str, limit: usize) -> Result<Vec<FlowRun>> {
+    with_connection(config, |conn| {
+        let lim = i64::try_from(limit.max(1)).context("Run history limit overflow")?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {FLOW_RUN_COLUMNS} FROM flow_runs WHERE flow_id = ?1 \
+             ORDER BY started_at DESC, id DESC LIMIT ?2"
+        ))?;
+        let rows = stmt.query_map(params![flow_id, lim], map_flow_run_row)?;
+        let mut runs = Vec::new();
+        for row in rows {
+            runs.push(row?);
+        }
+        Ok(runs)
+    })
+}
+
+fn map_flow_run_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<FlowRun> {
+    let steps_raw: String = row.get(6)?;
+    let steps: Vec<FlowRunStep> = serde_json::from_str(&steps_raw).map_err(sql_conversion_error)?;
+    let pending_raw: String = row.get(7)?;
+    let pending_approvals: Vec<String> =
+        serde_json::from_str(&pending_raw).map_err(sql_conversion_error)?;
+
+    Ok(FlowRun {
+        id: row.get(0)?,
+        flow_id: row.get(1)?,
+        thread_id: row.get(2)?,
+        status: row.get(3)?,
+        started_at: row.get(4)?,
+        finished_at: row.get(5)?,
+        steps,
+        pending_approvals,
+        error: row.get(8)?,
     })
 }
 

@@ -426,6 +426,17 @@ pub enum DomainEvent {
         /// Optional job name for display/threading purposes.
         job_name: Option<String>,
     },
+    /// A `flow`-type cron job fired its schedule tick (issue B2,
+    /// `my_docs/ohxtf/b2-triggers-trust/01-triggers-and-trust.md` §1).
+    /// Published by `cron::scheduler` when a `JobType::Flow` job comes due;
+    /// carries only the flow id (the trigger payload for a `schedule` flow is
+    /// always empty — `flows::ops::flows_run` seeds `{}`). Consumed by
+    /// `flows::bus::FlowTriggerSubscriber`, which loads the flow, checks it is
+    /// still enabled with a `schedule` trigger, and spawns a run.
+    FlowScheduleTick {
+        /// Identifier of the `flows::Flow` to run.
+        flow_id: String,
+    },
 
     // ── Skills ──────────────────────────────────────────────────────────
     /// A skill was loaded into the runtime.
@@ -1281,7 +1292,8 @@ impl DomainEvent {
             Self::CronJobTriggered { .. }
             | Self::CronJobCompleted { .. }
             | Self::CronDeliveryRequested { .. }
-            | Self::ProactiveMessageRequested { .. } => "cron",
+            | Self::ProactiveMessageRequested { .. }
+            | Self::FlowScheduleTick { .. } => "cron",
 
             Self::WorkflowLoaded { .. }
             | Self::WorkflowStopped { .. }
@@ -1439,6 +1451,7 @@ impl DomainEvent {
             Self::CronJobCompleted { .. } => "CronJobCompleted",
             Self::CronDeliveryRequested { .. } => "CronDeliveryRequested",
             Self::ProactiveMessageRequested { .. } => "ProactiveMessageRequested",
+            Self::FlowScheduleTick { .. } => "FlowScheduleTick",
             Self::WorkflowLoaded { .. } => "WorkflowLoaded",
             Self::WorkflowStopped { .. } => "WorkflowStopped",
             Self::WorkflowStartFailed { .. } => "WorkflowStartFailed",

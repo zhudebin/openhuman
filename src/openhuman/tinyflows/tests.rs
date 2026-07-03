@@ -23,14 +23,14 @@ use std::sync::Arc;
 
 use serde_json::json;
 use tempfile::TempDir;
-use tinyflows::caps::{CodeLanguage, CodeRunner, HttpClient, StateStore};
+use tinyflows::caps::{CodeLanguage, CodeRunner, HttpClient, StateStore, ToolInvoker};
 use tinyflows::model::{Edge, Node, NodeKind, WorkflowGraph};
 
 use crate::openhuman::config::Config;
 use crate::openhuman::security::SecurityPolicy;
 
 use super::build_capabilities;
-use super::caps::{FlowStateStore, OpenHumanCode, OpenHumanHttp};
+use super::caps::{FlowStateStore, OpenHumanCode, OpenHumanHttp, OpenHumanTools};
 
 fn test_config(tmp: &TempDir) -> Arc<Config> {
     let config = Config {
@@ -211,4 +211,138 @@ async fn code_adapter_javascript_passthrough_round_trips_json() {
         .await
         .expect("javascript passthrough should succeed when node is present");
     assert_eq!(result, input);
+}
+
+// ── Tool curation / scope + connection_ref (issue B2) ─────────────────────
+//
+// No `ApprovalGate` is installed in this test binary (see the module doc on
+// `flows::bus`'s tests and the trust-model tests in `approval::gate` for the
+// gate-level behavior) — these tests exercise the *curation* gate, which is
+// independent of the approval gate and runs first, so they stay deterministic
+// without any global state.
+
+fn tools_adapter(config: Arc<Config>) -> OpenHumanTools {
+    OpenHumanTools { config }
+}
+
+#[tokio::test]
+async fn tools_invoke_rejects_a_non_curated_slug_for_a_known_toolkit() {
+    let tmp = TempDir::new().unwrap();
+    let tools = tools_adapter(test_config(&tmp));
+
+    // "gmail" has a curated catalog; this action is not in it, so curation
+    // must reject regardless of the user's read/write/admin scope prefs.
+    let err = tools
+        .invoke("GMAIL_NOT_A_REAL_CURATED_ACTION", json!({}), None)
+        .await
+        .expect_err("a non-curated action for a curated toolkit must be rejected");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("tool not permitted"),
+        "expected a curation rejection message, got: {msg}"
+    );
+    assert!(msg.contains("GMAIL_NOT_A_REAL_CURATED_ACTION"));
+}
+
+#[tokio::test]
+async fn tools_invoke_rejects_an_unrecognized_toolkit_slug() {
+    // Issue B2 finding #2 (deny-by-default): a made-up toolkit prefix that
+    // isn't in any curated catalog must be rejected — not passed through on
+    // a permissive "unknown toolkit" heuristic. Live testing confirmed this
+    // used to reach Composio (and only failed there for lack of a signed-in
+    // session), which is not a hard allowlist.
+    let tmp = TempDir::new().unwrap();
+    let tools = tools_adapter(test_config(&tmp));
+
+    let err = tools
+        .invoke("madeupkit_dostuff", json!({}), None)
+        .await
+        .expect_err("an unrecognized toolkit slug must be rejected by curation");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("tool not permitted"),
+        "expected a curation rejection message, got: {msg}"
+    );
+    assert!(msg.contains("madeupkit_dostuff"));
+}
+
+#[tokio::test]
+async fn tools_invoke_rejects_a_prefix_less_slug() {
+    // "noop" has no curated catalog (`catalog_for_toolkit` returns `None`
+    // for the single-segment "toolkit" `toolkit_from_slug` degrades it to),
+    // so the hard allowlist in `is_curated_flow_tool` rejects it outright —
+    // unlike the general agent tool-call path's `is_action_visible_with_pref`,
+    // which falls back to the permissive `classify_unknown` heuristic and
+    // would let this slug through.
+    let tmp = TempDir::new().unwrap();
+    let tools = tools_adapter(test_config(&tmp));
+
+    let err = tools
+        .invoke("noop", json!({}), None)
+        .await
+        .expect_err("a prefix-less/unrecognized slug must be rejected by curation");
+    assert!(
+        err.to_string().contains("tool not permitted"),
+        "expected a curation rejection message, got: {err}"
+    );
+}
+
+#[tokio::test]
+async fn tools_invoke_does_not_reject_a_known_curated_slug_at_the_curation_gate() {
+    // A real curated action for a known toolkit must clear the curation
+    // gate — it may still fail further downstream (no composio client
+    // configured in this test environment), but that failure must NOT be
+    // the "tool not permitted" curation-rejection message.
+    let tmp = TempDir::new().unwrap();
+    let tools = tools_adapter(test_config(&tmp));
+
+    let err = tools
+        .invoke("GMAIL_SEND_EMAIL", json!({}), None)
+        .await
+        .expect_err("no composio client is configured in the test environment");
+    assert!(
+        !err.to_string().contains("tool not permitted"),
+        "a known curated slug must not be rejected by curation, got: {err}"
+    );
+}
+
+#[test]
+fn composio_connection_id_parses_toolkit_prefixed_ref() {
+    assert_eq!(
+        super::caps::composio_connection_id("composio:slack:acct_123"),
+        Some("acct_123")
+    );
+    // Trailing segment only — works even without a toolkit segment present.
+    assert_eq!(
+        super::caps::composio_connection_id("composio::acct_1"),
+        Some("acct_1")
+    );
+}
+
+#[test]
+fn composio_connection_id_returns_none_for_non_composio_ref_or_empty_id() {
+    assert_eq!(
+        super::caps::composio_connection_id("http_cred:my-secret"),
+        None
+    );
+    assert_eq!(super::caps::composio_connection_id("composio:"), None);
+    assert_eq!(super::caps::composio_connection_id("composio:slack:"), None);
+}
+
+#[test]
+fn http_cred_name_parses_and_trims() {
+    assert_eq!(
+        super::caps::http_cred_name("http_cred:my-secret"),
+        Some("my-secret")
+    );
+    assert_eq!(
+        super::caps::http_cred_name("http_cred: spaced "),
+        Some("spaced")
+    );
+}
+
+#[test]
+fn http_cred_name_returns_none_for_non_http_cred_ref_or_empty_name() {
+    assert_eq!(super::caps::http_cred_name("composio:slack:acct_1"), None);
+    assert_eq!(super::caps::http_cred_name("http_cred:"), None);
 }
