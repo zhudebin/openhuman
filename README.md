@@ -24,11 +24,9 @@
    </a>
  </p>
 
-
 <p align="center">
- <strong>OpenHuman is your Personal AI super intelligence: local memory, managed services where needed, simple and powerful.</strong>
+ <strong>OpenHuman is your personal AI super intelligence: a brain that remembers everything, a fantastic orchestrator, a deep researcher. Local-first, simple, powerful.</strong>
 </p>
-
 
 <p align="center">
  <a href="https://discord.tinyhumans.ai/">Discord</a> •
@@ -41,8 +39,6 @@
 <p align="center">
   🇺🇸 <a href="./README.md">English</a> | 🇨🇳 <a href="./docs/README.zh-CN.md">简体中文</a> | 🇯🇵 <a href="./docs/README.ja-JP.md">日本語</a> | 🇰🇷 <a href="./docs/README.ko.md">한국어</a> | 🇩🇪 <a href="./docs/README.de.md">Deutsch</a> | 🇵🇰 <a href="./docs/README.ur-pk.md">اردو</a>
 </p>
-
-
 
 <p align="center">
  <img src="https://img.shields.io/badge/status-early%20beta-orange" alt="Early Beta" />
@@ -58,7 +54,7 @@
 
 > **Early Beta**: Under active development. Expect rough edges.
 
-> **Local + managed services, upfront:** OpenHuman stores its Memory Tree, Obsidian-style Markdown vault, workspace config, and local runtime state on your machine. The default managed experience still uses OpenHuman-hosted services for account sign-in, model routing, web search proxying, and managed integration/OAuth flows through the Composio connector layer. Choose custom/local settings if you want to bring your own model, search, or Composio credentials; some real-time triggers and hosted features still require the managed backend.
+> 🎉 Within one week of launch, OpenHuman became the number one trending repository on GitHub for nine days in a row.
 
 # Install
 
@@ -112,27 +108,36 @@ A separately signed script-install path is not currently available. Issue [#2620
 
 # What is OpenHuman?
 
-OpenHuman is an open-source agentic assistant designed to integrate with you in your daily life. Each bullet links to the deeper writeup in the [docs](https://tinyhumans.gitbook.io/openhuman/).
+OpenHuman is three things most assistants aren't: **a brain** that builds a persistent, local memory of your world; **a fantastic orchestrator** that runs fleets of agents on durable graphs; and **a deep researcher** that sweeps your data and the web before you finish asking. Every bullet links to the deeper writeup in the [docs](https://tinyhumans.gitbook.io/openhuman/).
 
-- **Simple, UI-first & Human** A clean desktop experience and short onboarding paths take you from install to a working agent in a few clicks — no config-first setup, no terminal required. The agent has [a face](https://tinyhumans.gitbook.io/openhuman/features/mascot): a desktop mascot that speaks, reacts to its surroundings, [joins your Google Meets](https://tinyhumans.gitbook.io/openhuman/features/mascot/meeting-agents) as a real participant, remembers you across weeks, and keeps thinking in the background even when you've stopped typing.
+### 🧠 The brain
 
-- **100+ one-click OAuth integrations, 5,000+ MCP servers, 90,000+ Skills**: plug into Gmail, Notion, GitHub, Slack, Stripe, Calendar, Drive, Linear, Jira and the rest of your stack with [**one-click OAuth**](https://tinyhumans.gitbook.io/openhuman/features/integrations) — 100+ curated connectors brokered through the Composio layer. Beyond that, OpenHuman browses the open **Model Context Protocol** ecosystem (Smithery + the official MCP registry — thousands of servers) and a **90,000-entry Skills catalog**, so the agent can install new typed tools and skills on demand. Every connection becomes a typed tool, and every twenty minutes [auto-fetch](https://tinyhumans.gitbook.io/openhuman/features/obsidian-wiki/auto-fetch) walks each active connection and pulls fresh data into the [memory tree](https://tinyhumans.gitbook.io/openhuman/features/memory-tree). No prompts, no polling loops you have to write, so the agent already has tomorrow's context this morning.
+- **[Memory Tree](https://tinyhumans.gitbook.io/openhuman/features/memory-tree) + [Obsidian Wiki](https://tinyhumans.gitbook.io/openhuman/features/obsidian-wiki)**: your data compressed into scored Markdown trees in SQLite on your machine, mirrored as an [Obsidian vault](https://x.com/karpathy/status/2039805659525644595) you can open and edit. No vector-soup black box.
+- **[100+ OAuth integrations, 5,000+ MCP servers, 90,000+ Skills](https://tinyhumans.gitbook.io/openhuman/features/integrations)**: one click into Gmail, Notion, GitHub, Slack and the rest of your stack. [Auto-fetch](https://tinyhumans.gitbook.io/openhuman/features/obsidian-wiki/auto-fetch) feeds the brain every 20 minutes — it has tomorrow's context this morning.
+- **[A subconscious](https://tinyhumans.gitbook.io/openhuman/features/subconscious)**: a background loop that diffs your world, advances your goals, and writes your morning briefing — thinking continues after you stop typing.
+- **[Goals & Todos](https://tinyhumans.gitbook.io/openhuman/features/goals-and-todos)**: long-term goals, durable per-thread goals, and a shared kanban board per conversation.
+- **[TokenJuice](https://tinyhumans.gitbook.io/openhuman/features/token-compression)**: tool output compressed before it hits the model — same information, up to 80% fewer tokens. A brain this big would be unaffordable without it.
 
-  Managed integrations use OpenHuman's Composio connector layer. OAuth handshakes and integration tool calls are proxied through the managed backend by default. If you want to run Composio directly instead, configure direct mode with your own Composio API key; real-time trigger webhooks then need to be hosted and wired by you.
+### 🕸️ The orchestrator
 
-- **[Memory Tree](https://tinyhumans.gitbook.io/openhuman/features/memory-tree) + [Obsidian Wiki](https://tinyhumans.gitbook.io/openhuman/features/obsidian-wiki)**: a local-first knowledge base built from your data and your activity. Everything you connect is canonicalized into ≤3k-token Markdown chunks, scored, and folded into hierarchical summary trees stored in **SQLite on your machine**. The same chunks land as `.md` files in an Obsidian-compatible vault you can open, browse and edit, inspired by Karpathy's [obsidian-wiki workflow](https://x.com/karpathy/status/2039805659525644595).
+- **[Workflows](https://tinyhumans.gitbook.io/openhuman/features/workflows)** _(new)_: the agent proposes the automation; you review it on a canvas and save. Durable, trigger-driven, approval-gated runs on open-source [tinyflows](https://github.com/tinyhumansai/tinyflows).
+- **[A harness that finishes the job](https://tinyhumans.gitbook.io/openhuman/developing/architecture/agent-harness)** _(new)_: checkpointed graph runs on open-source [tinyagents](https://github.com/tinyhumansai/tinyagents) — stuck agents get steered, halted ones return a root cause, every run replays with real per-call costs.
+- **[A split brain, always on](https://tinyhumans.gitbook.io/openhuman/features/orchestration)** _(new)_: a fast reflex agent triages inbound traffic while a deep reasoning core delegates to worker fleets, steered by the subconscious.
+- **[An agent economy](https://tinyhumans.gitbook.io/openhuman/features/tinyplace)**: a `@handle` on [tiny.place](https://tiny.place), Signal-encrypted agent-to-agent orchestration, x402 USDC bounties and trading — keys never touch disk.
 
-- **[SuperContext](https://tinyhumans.gitbook.io/openhuman/features/super-context)**: a fresh chat shouldn't start cold. With SuperContext enabled, the harness deterministically spawns a read-only `context_scout` on the **first turn of every new thread** — it sweeps your memory tree, files, and connected data, assembles a bounded context bundle, and prepends it to your message before the model ever reads it. No tool call to wait on, no "let me look that up" round-trip: the agent answers your first message already knowing the relevant background. Toggle it from the composer or `context.super_context_enabled`.
+### 🔬 The deep researcher & doer
 
-- **[Goals & Todos](https://tinyhumans.gitbook.io/openhuman/features/goals-and-todos)**: OpenHuman keeps the agent pointed at what matters. A short, human-editable list of **long-term goals** (`MEMORY_GOALS.md`) rides along in memory and can self-reflect against your recent activity; each **thread** can carry a single durable **goal** with an optional token budget that the agent works across turns, interrupts and idle periods (autonomous idle continuation); and every conversation hosts a **kanban task board** of todos that you and the agent build together — plans, acceptance criteria, approval gates and all. There's also a personal task list you own outright.
+- **[SuperContext](https://tinyhumans.gitbook.io/openhuman/features/super-context)**: a research scout sweeps your memory and files before the model reads your first message. No cold starts.
+- **Batteries included**: web search, scraper, coder toolset, a real [browser](https://tinyhumans.gitbook.io/openhuman/features/native-tools/browser-and-computer), [native voice](gitbooks/features/native-tools/voice.md) with in-process Whisper — and [model routing](https://tinyhumans.gitbook.io/openhuman/features/model-routing) that picks the right LLM per workload, one subscription, [local AI optional](https://tinyhumans.gitbook.io/openhuman/features/model-routing/local-ai).
+- **[Meeting agents](https://tinyhumans.gitbook.io/openhuman/features/mascot/meeting-agents)** _(new)_: joins **Meet, Zoom, Teams, and Webex** with a face and a voice — auto-joins from your calendar, streams a live transcript, answers by name, files summary + action items.
+- **[Image & video generation](https://tinyhumans.gitbook.io/openhuman/features/native-tools)** _(new)_: Seedream/SeedEdit images and Seedance/Veo video, straight into your workspace on the same subscription.
+- **[17 messaging channels](https://tinyhumans.gitbook.io/openhuman/features/channels)**: Telegram, Discord, Slack, WhatsApp, Signal, iMessage… plus **native email** (IMAP IDLE + SMTP). Your agent reaches you where you already are.
 
-- **[Themes & Theme Studio](https://tinyhumans.gitbook.io/openhuman/features/theming)**: make it yours. Five built-in theme families (Classic, Ocean, Sepia, Matrix, HAL 9000) ship in light/dark/auto variants, and the **Theme Studio** in Settings is a full visual editor — adjust every colour token with live contrast warnings, swap fonts per role, pick an animated WebGL-mesh / flat / custom-image backdrop, and export or import themes as JSON to share. Editing a preset auto-forks a custom theme so the originals stay pristine; everything applies instantly and persists locally.
+### 🧍 Human, private, yours
 
-- **Batteries included**: web search, a web-fetch [scraper](https://tinyhumans.gitbook.io/openhuman/features/native-tools), a full coder toolset (filesystem, git, lint, test, grep), and [native voice](gitbooks/features/native-tools/voice.md) (STT in, ElevenLabs TTS out, mascot lip-sync, live Google Meet agent) are wired in by default. By default, [model routing](https://tinyhumans.gitbook.io/openhuman/features/model-routing) uses the OpenHuman backend to select and proxy the right LLM for each workload (reasoning, fast, or vision). One subscription includes all models. No "install a plugin to read files" friction. Use [optional local AI via Ollama](https://tinyhumans.gitbook.io/openhuman/features/model-routing/local-ai) for supported on-device workloads.
-
-- **[Smart token compression (TokenJuice)](https://tinyhumans.gitbook.io/openhuman/features/token-compression)**: every tool call, scrape result, email body, and search payload is run through a token compression layer before it touches any LLM Model. HTML is converted to Markdown, long URLs are shortened, and verbose tool output is deduped and summarized via a configurable rule overlay etc... CJK, emoji, and other multi-byte text are preserved grapheme-by-grapheme — never stripped. You get the same information but at a fraction of the tokens. Reducing cost &amp; latency by up to 80%.
-
-- **[Messaging channels](https://tinyhumans.gitbook.io/openhuman/features/integrations#messaging-channels)** and **[privacy & security](https://tinyhumans.gitbook.io/openhuman/features/privacy-and-security)**: inbound/outbound across the channels you already use, with workflow data that stays on device, encrypted locally, treated as yours.
+- **Simple, UI-first & Human**: install to working agent in a few clicks — no config files, no terminal. And it has [a face](https://tinyhumans.gitbook.io/openhuman/features/mascot): a mascot that speaks, reacts, and remembers you.
+- **[Privacy & security](https://tinyhumans.gitbook.io/openhuman/features/privacy-and-security)**: on-device encrypted data, approval gate, OS-keyring secrets, opt-in sandboxing — and _(new)_ **[Privacy Mode](https://tinyhumans.gitbook.io/openhuman/features/privacy-mode)**: one switch and no inference leaves your machine, enforced in the Rust core.
+- **[Themes & Theme Studio](https://tinyhumans.gitbook.io/openhuman/features/theming)**: five theme families plus a full visual editor, exportable as JSON.
 
 ## Contributing from source
 
@@ -160,21 +165,38 @@ In just one sync pass, the agent has full (compressed) context of your inbox, yo
 
 Already self-host [agentmemory](https://github.com/rohitg00/agentmemory) across other coding agents? OpenHuman ships an optional `Memory` backend that proxies to it — set `memory.backend = "agentmemory"` in `config.toml` and the same durable store powers OpenHuman alongside Claude Code, Cursor, Codex, and OpenCode. See the [agentmemory backend](https://tinyhumans.gitbook.io/openhuman/features/obsidian-wiki/agentmemory-backend) page for setup.
 
+## An orchestrator, not a chatbot
+
+The deepest difference isn't any single feature — it's the execution model. Claude Code, OpenClaw, and Hermes run **one agent in one loop**. OpenHuman is an **[orchestrator](https://tinyhumans.gitbook.io/openhuman/features/orchestration)**:
+
+- **Graphs, not loops** — turns compile to checkpointed state-machine graphs on [tinyagents](https://github.com/tinyhumansai/tinyagents): pause for a human, survive a restart, resume mid-run.
+- **Sub-agent fleets** — specialists spawn three levels deep, idle workers get reused, and circuit breakers turn stuck agents into root-cause reports.
+- **Workflows you can see** — agent-proposed [tinyflows](https://github.com/tinyhumansai/tinyflows) graphs, reviewed on a canvas: durable, trigger-driven, approval-gated.
+- **A split brain, always on** — a fast reflex agent triages while a deep core reasons, steered by the subconscious loop.
+- **Agent-to-agent, encrypted** — instances orchestrate each other over **Signal-protocol E2E** sessions with consent-based pairing and x402 payments. No server sees plaintext.
+- **Next: RLMs** — the model writing its own orchestration code in a sandboxed REPL, on the same graph engine and trust model.
+
 ## OpenHuman vs Other Agent Harnesses
 
 High-level comparison (products evolve, so verify against each vendor). OpenHuman is built to **minimize vendor sprawl**, keep **workflow knowledge on-device**, and give the agent a **persistent memory** of your data, not only chat.
 
-|                     | Claude Cowork     | OpenClaw          | Hermes Agent      | OpenHuman                          |
-| ------------------- | ----------------- | ----------------- | ----------------- | ---------------------------------- |
-| **Open-source**     | 🚫 Proprietary    | ✅ MIT            | ✅ MIT            | ✅ GNU                             |
-| **Simple to start** | ✅ Desktop + CLI  | ⚠️ Terminal-first | ⚠️ Terminal-first | ✅ Clean UI, minutes               |
-| **Cost**            | ⚠️ Sub + add-ons  | ⚠️ BYO models     | ⚠️ BYO models     | ✅ One sub + TokenJuice            |
-| **Memory**          | ✅ Chat-scoped    | ⚠️ Plugin-reliant | ✅ Self-learning  | 🚀 Memory Tree + Obsidian vault, optional [agentmemory](https://github.com/rohitg00/agentmemory) backend |
-| **Integrations**    | ⚠️ Few connectors | ⚠️ BYO            | ⚠️ BYO            | 🚀 100+ OAuth · 5k+ MCP · 90k+ Skills |
-| **Auto-fetch**      | 🚫 None           | 🚫 None           | 🚫 None           | ✅ 20-min sync into memory         |
-| **API sprawl**      | 🚫 Extra keys     | 🚫 BYOK           | 🚫 Multi-vendor   | ✅ One account                     |
-| **Model routing**   | 🚫 Single model   | ⚠️ Manual         | ⚠️ Manual         | ✅ Built-in                        |
-| **Native tools**    | ✅ Code-only      | ✅ Code-only      | ✅ Code-only      | ✅ Code + search + scraper + voice |
+|                        | Claude Cowork     | OpenClaw          | Hermes Agent      | OpenHuman                                                                                                |
+| ---------------------- | ----------------- | ----------------- | ----------------- | -------------------------------------------------------------------------------------------------------- |
+| **Open-source**        | 🚫 Proprietary    | ✅ MIT            | ✅ MIT            | ✅ GNU                                                                                                   |
+| **Simple to start**    | ✅ Desktop + CLI  | ⚠️ Terminal-first | ⚠️ Terminal-first | ✅ Clean UI, minutes                                                                                     |
+| **Cost**               | ⚠️ Sub + add-ons  | ⚠️ BYO models     | ⚠️ BYO models     | ✅ One sub + TokenJuice                                                                                  |
+| **Memory**             | ✅ Chat-scoped    | ⚠️ Plugin-reliant | ✅ Self-learning  | 🚀 Memory Tree + Obsidian vault, optional [agentmemory](https://github.com/rohitg00/agentmemory) backend |
+| **Integrations**       | ⚠️ Few connectors | ⚠️ BYO            | ⚠️ BYO            | 🚀 100+ OAuth · 5k+ MCP · 90k+ Skills                                                                    |
+| **Auto-fetch**         | 🚫 None           | 🚫 None           | 🚫 None           | ✅ 20-min sync into memory                                                                               |
+| **Orchestration**      | ⚠️ Sub-tasks      | ⚠️ Single loop    | ⚠️ Single loop    | 🚀 Agent graphs + checkpoints + E2E-encrypted A2A                                                        |
+| **Workflows**          | 🚫 None           | ⚠️ Scripts        | ⚠️ Scripts        | 🚀 Visual, durable, agent-proposed, approval-gated                                                       |
+| **Meetings**           | 🚫 None           | 🚫 None           | 🚫 None           | 🚀 Joins Meet/Zoom/Teams/Webex, speaks, live transcript                                                  |
+| **Messaging channels** | 🚫 None           | ⚠️ A few          | ⚠️ A few          | ✅ 17 incl. native email (IMAP/SMTP)                                                                     |
+| **Local-only mode**    | 🚫 Cloud-only     | ⚠️ BYO local      | ⚠️ BYO local      | ✅ One-switch enforced Privacy Mode                                                                      |
+| **Observability**      | 🚫 Opaque         | ⚠️ Logs           | ⚠️ Logs           | ✅ Replayable run journals + per-call cost accounting                                                    |
+| **API sprawl**         | 🚫 Extra keys     | 🚫 BYOK           | 🚫 Multi-vendor   | ✅ One account                                                                                           |
+| **Model routing**      | 🚫 Single model   | ⚠️ Manual         | ⚠️ Manual         | ✅ Built-in                                                                                              |
+| **Native tools**       | ✅ Code-only      | ✅ Code-only      | ✅ Code-only      | ✅ Code + search + scraper + browser + voice + media gen                                                 |
 
 # Star us on GitHub
 
