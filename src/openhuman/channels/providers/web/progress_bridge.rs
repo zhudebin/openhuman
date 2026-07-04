@@ -184,6 +184,10 @@ pub(crate) fn spawn_progress_bridge(
                 .source
                 .clone()
                 .unwrap_or_else(|| "chat".to_string());
+            // Storage-level privacy gate (#4454): capture_content (off by
+            // default) rides on the TraceContext so the collector only attaches
+            // prompt/reply content to spans when the operator opted in — no
+            // exporter can serialize prompt/reply text otherwise.
             let capture_content = config.observability.agent_tracing.capture_content;
             log::debug!(
                 "[web_channel][bridge] trace context trace_id={} user_attributed={} \
@@ -896,7 +900,12 @@ pub(crate) fn spawn_progress_bridge(
                     output,
                     elapsed_ms,
                     iteration,
+                    failure,
                 } => {
+                    // Serialize the classified failure (if any) so a failed
+                    // sub-agent tool row carries its "why + next" copy on the
+                    // wire + ledger, matching the main-agent path (#4459).
+                    let failure_json = failure.as_ref().and_then(|f| serde_json::to_value(f).ok());
                     ledger_append_event(
                         &config,
                         RunEventAppend {
@@ -909,7 +918,8 @@ pub(crate) fn spawn_progress_bridge(
                                 "success": success,
                                 "outputChars": output_chars,
                                 "elapsedMs": elapsed_ms,
-                                "iteration": iteration
+                                "iteration": iteration,
+                                "failure": failure_json,
                             }),
                         },
                     );
@@ -928,6 +938,7 @@ pub(crate) fn spawn_progress_bridge(
                         // bounded size for the wire (#4007); `output_chars` +
                         // `elapsed_ms` still ride along in `subagent` below.
                         output: Some(cap_wire_output(output)),
+                        failure: failure_json,
                         subagent: Some(SubagentProgressDetail {
                             child_iteration: Some(iteration),
                             agent_id: Some(agent_id),
