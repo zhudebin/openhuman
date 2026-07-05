@@ -11,8 +11,10 @@
 //! that don't need it.
 
 use super::*;
+// Imported directly (not via `super::*`): this PR's store-op delegation dropped
+// store.rs's own `use chrono::Utc`, so the test module pulls it in itself.
 use crate::openhuman::memory_store::chunks::types::{chunk_id, Metadata, SourceRef};
-use chrono::TimeZone;
+use chrono::{TimeZone, Utc};
 use rusqlite::params;
 use tempfile::TempDir;
 
