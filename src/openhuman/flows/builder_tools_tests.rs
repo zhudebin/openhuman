@@ -247,6 +247,39 @@ async fn dry_run_supervised_runs_against_mock_and_labels_sandbox() {
 }
 
 #[tokio::test]
+async fn dry_run_exercises_agent_ref_node_via_mock_agent_runner() {
+    // A draft whose `agent` node selects a named agent kind (`agent_ref`) routes
+    // to the `AgentRunner` capability, not the plain LLM. Before wiring the mock
+    // runner the sandbox left `agent: None`, so such a draft errored on a missing
+    // capability; now `mock_capabilities_with_agent(MockAgentRunner)` echoes the
+    // ref and the dry run goes green — proving the builder can self-test drafts
+    // that use agent-kind nodes.
+    let tool = DryRunWorkflowTool::new(
+        policy(AutonomyLevel::Supervised),
+        test_config(&TempDir::new().unwrap()),
+    );
+    let graph = json!({
+        "nodes": [
+            { "id": "t", "kind": "trigger", "name": "Manual" },
+            { "id": "a", "kind": "agent", "name": "Plan",
+              "config": { "agent_ref": "researcher", "prompt": "outline it" } }
+        ],
+        "edges": [ { "from_node": "t", "to_node": "a" } ]
+    });
+    let result = tool
+        .execute(json!({ "graph": graph, "input": { "topic": "x" } }))
+        .await
+        .unwrap();
+    assert!(!result.is_error, "{}", result.output());
+    let parsed: Value = serde_json::from_str(&result.output()).unwrap();
+    assert_eq!(parsed["sandbox"], true);
+    assert_eq!(
+        parsed["ok"], true,
+        "agent_ref dry-run must be green: {parsed}"
+    );
+}
+
+#[tokio::test]
 async fn dry_run_invalid_graph_is_error() {
     let tool = DryRunWorkflowTool::new(
         policy(AutonomyLevel::Full),
@@ -362,5 +395,111 @@ async fn revise_workflow_warns_on_unwired_required_composio_arg() {
             .iter()
             .any(|w| w.as_str().unwrap_or_default().contains("`body`")),
         "wired arg must not warn: {warnings:?}"
+    );
+}
+
+// ── save_workflow ────────────────────────────────────────────────────────────
+
+/// Seed a saved flow to write into (the instant-create path does this via
+/// `flows_create` before delegating to the builder).
+async fn seed_flow(config: &Arc<Config>, name: &str) -> String {
+    let outcome = ops::flows_create(
+        config,
+        name.to_string(),
+        json!({
+            "nodes": [ { "id": "t", "kind": "trigger", "name": "Manual" } ],
+            "edges": []
+        }),
+        true,
+    )
+    .await
+    .unwrap();
+    outcome.value.id
+}
+
+#[tokio::test]
+async fn save_workflow_missing_flow_id_is_error() {
+    let tmp = TempDir::new().unwrap();
+    let tool = SaveWorkflowTool::new(test_config(&tmp));
+    // Persisting a definition is a Write-class action (no external effect at
+    // save time — the flow's own runs govern that).
+    assert_eq!(tool.permission_level(), PermissionLevel::Write);
+    assert!(!tool.external_effect());
+
+    let result = tool
+        .execute(json!({ "graph": valid_graph() }))
+        .await
+        .unwrap();
+    assert!(result.is_error);
+    assert!(result.output().contains("Missing 'flow_id'"));
+}
+
+#[tokio::test]
+async fn save_workflow_unknown_flow_is_error() {
+    let tmp = TempDir::new().unwrap();
+    let tool = SaveWorkflowTool::new(test_config(&tmp));
+
+    let result = tool
+        .execute(json!({ "flow_id": "nope", "graph": valid_graph() }))
+        .await
+        .unwrap();
+    assert!(result.is_error, "save onto a nonexistent flow must fail");
+    assert!(result.output().contains("nope"));
+}
+
+#[tokio::test]
+async fn save_workflow_persists_graph_and_name_onto_existing_flow() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let flow_id = seed_flow(&config, "Blank flow").await;
+    let tool = SaveWorkflowTool::new(config.clone());
+
+    let result = tool
+        .execute(json!({
+            "flow_id": flow_id,
+            "graph": valid_graph(),
+            "name": "AI News Digest"
+        }))
+        .await
+        .unwrap();
+    assert!(!result.is_error, "{}", result.output());
+
+    let parsed: Value = serde_json::from_str(&result.output()).unwrap();
+    assert_eq!(parsed["type"], "workflow_saved");
+    assert_eq!(parsed["flow_id"], flow_id.as_str());
+    assert_eq!(parsed["name"], "AI News Digest");
+    assert_eq!(parsed["node_count"], 2);
+    // Enablement / approval gate are NOT touched by the tool.
+    assert_eq!(parsed["require_approval"], true);
+
+    // The graph + name really persisted.
+    let saved = ops::flows_get(&config, &flow_id).await.unwrap().value;
+    assert_eq!(saved.name, "AI News Digest");
+    assert_eq!(saved.graph.nodes.len(), 2);
+}
+
+#[tokio::test]
+async fn save_workflow_rejects_invalid_graph_and_leaves_flow_intact() {
+    let tmp = TempDir::new().unwrap();
+    let config = test_config(&tmp);
+    let flow_id = seed_flow(&config, "Blank flow").await;
+    let tool = SaveWorkflowTool::new(config.clone());
+
+    let result = tool
+        .execute(json!({
+            "flow_id": flow_id,
+            // No trigger node — fails tinyflows validation.
+            "graph": { "nodes": [ { "id": "a", "kind": "agent", "name": "A" } ], "edges": [] }
+        }))
+        .await
+        .unwrap();
+    assert!(result.is_error);
+
+    let saved = ops::flows_get(&config, &flow_id).await.unwrap().value;
+    assert_eq!(saved.name, "Blank flow");
+    assert_eq!(
+        saved.graph.nodes.len(),
+        1,
+        "original graph must be untouched"
     );
 }

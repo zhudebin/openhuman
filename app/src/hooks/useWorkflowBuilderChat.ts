@@ -1,50 +1,54 @@
 /**
- * useWorkflowBuilderChat (Phase 5c) — a thin driver around the existing chat
- * runtime for the Flows prompt bar and canvas copilot. It owns a DEDICATED
- * thread (created lazily on first send) so a workflow-authoring conversation
- * never collides with the user's main chat, sends turns phrased to route to the
- * `workflow_builder` specialist (see `lib/flows/workflowBuilderPrompt.ts`), and
- * exposes the resulting `WorkflowProposal` the global `ChatRuntimeProvider`
- * parses onto this thread.
+ * useWorkflowBuilderChat — drives the Flows prompt bar and canvas copilot by
+ * running the `workflow_builder` agent server-side. It owns a DEDICATED thread
+ * (created lazily on first send) so an authoring conversation never collides
+ * with the user's main chat, sends a STRUCTURED turn request to
+ * `openhuman.flows_build` (which renders the brief and runs the agent), and
+ * surfaces the returned `WorkflowProposal` on this thread.
  *
- * It deliberately does NOT reimplement the chat runtime: the same
- * `addMessageLocal` → `chatSend` path and the same `pendingWorkflowProposalsByThread`
- * store slice that `Conversations.tsx` uses drive this. The only new concept is
- * per-surface thread scoping.
+ * The builder is now a first-class backend agent (like the Flow Scout): the core
+ * constructs the prompt and drives the agent to completion. Phase B streams that
+ * turn onto the copilot's dedicated thread (text / thinking / tool events +
+ * a terminal `chat_done`), so this hook passes its `threadId` into
+ * `openhuman.flows_build` and lets the GLOBAL `ChatRuntimeProvider` own the
+ * transcript: the provider appends the final assistant message on `chat_done`
+ * and populates `streamingAssistantByThread` / `toolTimelineByThread` /
+ * `pendingWorkflowProposalsByThread` for this thread as the turn runs. This hook
+ * only appends the local USER turn (the web channel never persists user
+ * messages) and reads the streamed state back out; the blocking
+ * `{proposal, error}` return is a fallback for when streaming isn't wired
+ * (CLI / tests / a missed socket event).
  *
- * Invariant: nothing here persists or enables a flow. The proposal is
- * validate-only; saving stays behind the explicit `WorkflowProposalCard`
- * "Save & enable" click.
+ * Invariant: `create`/`revise`/`repair` never persist; only a `build` turn (with
+ * a real flow id) may save onto an existing flow. Nothing here enables a flow.
  */
 import createDebug from 'debug';
 import { useCallback, useMemo, useState } from 'react';
 
-import { chatSend } from '../services/chatService';
+import { type BuilderTurnRequest, buildWorkflow } from '../services/api/flowsApi';
 import {
-  beginInferenceTurn,
-  clearRuntimeForThread,
   clearWorkflowProposalForThread,
-  setToolTimelineForThread,
+  setWorkflowProposalForThread,
+  type ToolTimelineEntry,
   type WorkflowProposal,
 } from '../store/chatRuntimeSlice';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectSocketStatus } from '../store/socketSelectors';
-import {
-  addMessageLocal,
-  clearThreadInferenceActive,
-  createNewThread,
-  markThreadInferenceActive,
-} from '../store/threadSlice';
+import { addMessageLocal, createNewThread } from '../store/threadSlice';
 import type { ThreadMessage } from '../types/thread';
 
 const log = createDebug('app:flows:builder-chat');
 
-/** A single builder turn: what the user sees vs. what the agent receives. */
+/** A single builder turn: what the user sees vs. the structured turn request. */
 export interface WorkflowBuilderSendParams {
   /** Human-readable text shown as the user's message in the thread transcript. */
   displayText: string;
-  /** The full delegation prompt actually sent to the core (may inject graph/context). */
-  prompt: string;
+  /**
+   * The structured builder-turn request. The core renders the agent's brief
+   * from this and runs `workflow_builder` directly (via `openhuman.flows_build`)
+   * — the frontend no longer crafts delegate prompt strings.
+   */
+  request: BuilderTurnRequest;
 }
 
 export interface UseWorkflowBuilderChat {
@@ -61,6 +65,18 @@ export interface UseWorkflowBuilderChat {
    * transcript reads.
    */
   messages: ThreadMessage[];
+  /**
+   * The dedicated thread's live tool timeline (streamed by `ChatRuntimeProvider`
+   * as the builder turn runs) — bound straight into the shared
+   * `ToolTimelineBlock`. Empty when nothing has streamed on this thread.
+   */
+  toolTimeline: ToolTimelineEntry[];
+  /**
+   * The builder turn's in-flight assistant text (the shared streaming lane), for
+   * `ToolTimelineBlock`'s `liveResponse`. Empty string once the turn settles —
+   * the final answer then lives in `messages`.
+   */
+  liveResponse: string;
   /** Last send error (thread create / RPC failure), or `null`. */
   error: string | null;
   /** Send a builder turn, creating the dedicated thread on first use. */
@@ -70,6 +86,7 @@ export interface UseWorkflowBuilderChat {
 }
 
 const EMPTY_MESSAGES: ThreadMessage[] = [];
+const EMPTY_TIMELINE: ToolTimelineEntry[] = [];
 
 /**
  * @param seedThreadId Optional existing thread to bind to instead of creating a
@@ -83,12 +100,19 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
   const [localSending, setLocalSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const activeThreadIds = useAppSelector(state => state.thread.activeThreadIds);
   const proposalsByThread = useAppSelector(
     state => state.chatRuntime.pendingWorkflowProposalsByThread
   );
   const messagesByThreadId = useAppSelector(state => state.thread.messagesByThreadId);
+  const toolTimelineByThread = useAppSelector(state => state.chatRuntime.toolTimelineByThread);
+  const streamingAssistantByThread = useAppSelector(
+    state => state.chatRuntime.streamingAssistantByThread
+  );
 
+  // Prefer the runtime's streamed proposal (populated on this thread by
+  // `ChatRuntimeProvider` as the builder's `propose_workflow`/`revise_workflow`
+  // tool result lands); the blocking `send` result is only a fallback that
+  // writes into the same slice.
   const proposal = useMemo(
     () => (threadId ? (proposalsByThread[threadId] ?? null) : null),
     [threadId, proposalsByThread]
@@ -99,12 +123,22 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
     [threadId, messagesByThreadId]
   );
 
-  // "Sending" = we're mid-dispatch OR the runtime still marks the thread active.
-  const runtimeActive = threadId ? Boolean(activeThreadIds[threadId]) : false;
-  const sending = localSending || runtimeActive;
+  const toolTimeline = useMemo(
+    () => (threadId ? (toolTimelineByThread[threadId] ?? EMPTY_TIMELINE) : EMPTY_TIMELINE),
+    [threadId, toolTimelineByThread]
+  );
+
+  const liveResponse = useMemo(
+    () => (threadId ? (streamingAssistantByThread[threadId]?.content ?? '') : ''),
+    [threadId, streamingAssistantByThread]
+  );
+
+  // The turn is a single request/response RPC (no streaming runtime), so
+  // "sending" is simply whether that call is in flight.
+  const sending = localSending;
 
   const send = useCallback(
-    async ({ displayText, prompt }: WorkflowBuilderSendParams) => {
+    async ({ displayText, request }: WorkflowBuilderSendParams) => {
       if (localSending) {
         log('send: ignored — a turn is already dispatching');
         return;
@@ -116,11 +150,6 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
       }
       setLocalSending(true);
       setError(null);
-      // Declared outside the try so the catch block can see a thread created
-      // during THIS call — `threadId` state doesn't update synchronously
-      // within the same closure invocation, so a failure after creation (but
-      // before this call returns) would otherwise see the stale `null` and
-      // skip cleanup, leaving that new thread's active markers dangling.
       let targetThreadId = threadId;
       try {
         if (!targetThreadId) {
@@ -144,23 +173,33 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
           addMessageLocal({ threadId: targetThreadId, message: userMessage })
         ).unwrap();
 
-        dispatch(setToolTimelineForThread({ threadId: targetThreadId, entries: [] }));
-        dispatch(beginInferenceTurn({ threadId: targetThreadId }));
-        dispatch(markThreadInferenceActive(targetThreadId));
+        // Run the workflow_builder agent server-side, streaming its turn onto
+        // this thread (Phase B): passing `targetThreadId` makes the core emit
+        // text/thinking/tool events + a terminal `chat_done` keyed by it. The
+        // GLOBAL `ChatRuntimeProvider` owns that transcript — it appends the
+        // final assistant message on `chat_done` and fills the streaming/tool
+        // slices as the turn runs — so this hook must NOT also append the agent
+        // reply (doing so would double it). We still await the blocking result
+        // for its `proposal`/`error` fallback.
+        log('send: running flows_build thread=%s mode=%s', targetThreadId, request.mode);
+        const result = await buildWorkflow(request, targetThreadId);
 
-        log('send: dispatching builder turn thread=%s', targetThreadId);
-        await chatSend({ threadId: targetThreadId, message: prompt });
+        // Surface the proposal via the same store slice the streamed path used,
+        // so `WorkflowProposalCard` / the copilot preview render unchanged. This
+        // is a fallback: when streaming is wired the runtime already populated
+        // `pendingWorkflowProposalsByThread` from the tool result; re-writing the
+        // same value here is idempotent and covers a missed socket event / CLI.
+        if (result.proposal) {
+          dispatch(
+            setWorkflowProposalForThread({ threadId: targetThreadId, proposal: result.proposal })
+          );
+        } else if (result.error) {
+          setError(result.error);
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         log('send: failed err=%o', err);
         setError(msg);
-        // The runtime never got a turn to end, so release the active markers we
-        // optimistically set (guarded: targetThreadId is still null only when
-        // thread creation itself failed, in which case there's nothing to clear).
-        if (targetThreadId) {
-          dispatch(clearRuntimeForThread({ threadId: targetThreadId }));
-          dispatch(clearThreadInferenceActive(targetThreadId));
-        }
       } finally {
         setLocalSending(false);
       }
@@ -172,5 +211,15 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
     if (threadId) dispatch(clearWorkflowProposalForThread({ threadId }));
   }, [dispatch, threadId]);
 
-  return { threadId, sending, proposal, messages, error, send, clearProposal };
+  return {
+    threadId,
+    sending,
+    proposal,
+    messages,
+    toolTimeline,
+    liveResponse,
+    error,
+    send,
+    clearProposal,
+  };
 }

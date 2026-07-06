@@ -3903,6 +3903,11 @@ const messages: TranslationMap = {
   'flows.nodeConfig.composio.customPlaceholder': 'SLUG_NAME',
   'flows.nodeConfig.agent.modelHint': 'Wybierz poziom możliwości — obszar roboczy rozwiąże model.',
   'flows.nodeConfig.agent.modelInherit': 'Domyślnie (dziedzicz)',
+  'flows.nodeConfig.agent.agentRefLabel': 'Agent',
+  'flows.nodeConfig.agent.agentRefHint':
+    'Uruchom ten węzeł jako zarejestrowanego agenta — obowiązują jego narzędzia i zabezpieczenia.',
+  'flows.nodeConfig.agent.agentRefInherit': 'Domyślny (kreator przepływów)',
+  'flows.nodeConfig.agent.modelManagedTiers': 'Zarządzane poziomy',
   'flows.nodeConfig.agent.modelHints': 'Wskazówki modelu',
   'flows.nodeConfig.agent.modelCustom': 'Model niestandardowy…',
   'flows.nodeConfig.agent.modelCustomPlaceholder': 'np. gpt-4o-mini',
@@ -4010,6 +4015,9 @@ const messages: TranslationMap = {
   'flows.templates.ask-agent.name': 'Zapytaj agenta',
   'flows.templates.ask-agent.description':
     'Prosty ręczny wyzwalacz, który przekazuje zadanie agentowi.',
+  'flows.templates.opus-sonnet-brief.name': 'Brief badawczy (Opus planuje, Sonnet redaguje)',
+  'flows.templates.opus-sonnet-brief.description':
+    'Agent klasy rozumowania planuje brief, agent klasy czatu go redaguje, a następnie wynik zostaje ukształtowany dla Ciebie.',
 
   'oauth.button.connecting': 'Łączenie...',
   'oauth.button.loopbackTimeout':

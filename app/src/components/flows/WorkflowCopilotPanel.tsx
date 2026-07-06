@@ -8,10 +8,13 @@
  * transcript, surfaces each proposal's node-level diff, and hands Accept/Reject
  * up to the host, which applies it to the local draft overlay.
  *
- * Chat UI parity: the composer is the same {@link ChatComposer} the main chat
- * windows use (mic/attachments off here), and turns render as bubbles via the
- * shared {@link BubbleMarkdown}, so the copilot reads like a real chat rather
- * than a one-shot form.
+ * Chat UI parity: the copilot reuses the SHARED chat surface end-to-end — the
+ * same {@link ChatComposer} the main chat windows use (mic/attachments off
+ * here), turns render as bubbles via the shared {@link BubbleMarkdown}, and the
+ * builder turn's live tool activity + streaming reply render through the shared
+ * {@link ToolTimelineBlock} (fed from the runtime's `toolTimelineByThread` /
+ * `streamingAssistantByThread`, streamed here by Phase B). So the copilot reads
+ * like a real chat rather than a one-shot form.
  *
  * Invariant: the copilot only PROPOSES. Accept applies to the UNSAVED local
  * draft (no `flows_update`); persistence stays behind the canvas's own Save.
@@ -21,16 +24,27 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWorkflowBuilderChat } from '../../hooks/useWorkflowBuilderChat';
 import { diffGraphs } from '../../lib/flows/graphDiff';
 import type { WorkflowGraph } from '../../lib/flows/types';
-import {
-  buildRepairPrompt,
-  buildRevisePrompt,
-  type RepairPromptContext,
-} from '../../lib/flows/workflowBuilderPrompt';
 import { useT } from '../../lib/i18n/I18nContext';
 import { BubbleMarkdown } from '../../pages/conversations/components/AgentMessageBubble';
+import { ToolTimelineBlock } from '../../pages/conversations/components/ToolTimelineBlock';
 import type { WorkflowProposal } from '../../store/chatRuntimeSlice';
 import ChatComposer from '../chat/ChatComposer';
 import Button from '../ui/Button';
+
+/**
+ * Context for a repair turn opened from a failed run's inspector ("Fix with
+ * agent"). Maps directly onto a `repair`-mode builder request.
+ */
+export interface RepairPromptContext {
+  /** The failed run id (== thread_id) so the agent can `get_flow_run` it. */
+  runId: string;
+  /** The run-level error message, if any. */
+  error?: string | null;
+  /** Node ids that failed / are implicated, if known. */
+  failingNodeIds?: string[];
+  /** The flow's current graph, injected so the fix builds on the real draft. */
+  graph: WorkflowGraph;
+}
 
 interface Props {
   /** The current draft graph, injected as context for each revise turn. */
@@ -58,6 +72,12 @@ interface Props {
    */
   repairSeed?: RepairPromptContext | null;
   /**
+   * Optional build seed (from the Flows prompt bar's instant-create path) —
+   * auto-sends the user's workflow description once on mount so the copilot
+   * opens already building it against the just-created blank flow.
+   */
+  buildSeed?: { description: string } | null;
+  /**
    * The workflow's persisted copilot thread id (from the per-flow cache), so
    * reopening the panel resumes the same conversation instead of starting fresh.
    */
@@ -74,12 +94,22 @@ export default function WorkflowCopilotPanel({
   onReject,
   onClose,
   repairSeed = null,
+  buildSeed = null,
   seedThreadId = null,
   onThreadIdChange,
 }: Props) {
   const { t } = useT();
-  const { threadId, sending, proposal, messages, error, send, clearProposal } =
-    useWorkflowBuilderChat(seedThreadId);
+  const {
+    threadId,
+    sending,
+    proposal,
+    messages,
+    toolTimeline,
+    liveResponse,
+    error,
+    send,
+    clearProposal,
+  } = useWorkflowBuilderChat(seedThreadId);
   const [text, setText] = useState('');
 
   // Report the (lazily-created) thread id up so the host persists it per flow —
@@ -110,22 +140,53 @@ export default function WorkflowCopilotPanel({
     repairSentRef.current = true;
     void send({
       displayText: t('flows.copilot.repairDisplay'),
-      prompt: buildRepairPrompt(repairSeed),
+      request: {
+        mode: 'repair',
+        instruction: '',
+        graph: repairSeed.graph,
+        runId: repairSeed.runId,
+        error: repairSeed.error ?? null,
+        failingNodeIds: repairSeed.failingNodeIds ?? [],
+      },
     });
   }, [repairSeed, send, t]);
 
-  // Keep the transcript pinned to the newest message / thinking indicator.
+  // Auto-send the build turn once when opened from the prompt bar's
+  // instant-create path: the user's description becomes the first user turn on
+  // this thread, and the prompt asks for the full build → dry-run → save arc
+  // against the just-created flow (its proposal still lands as the usual
+  // Accept/Reject diff preview). Falls back to a propose-only revise turn if
+  // the flow id is somehow missing (a draft canvas has nothing to save onto).
+  const buildSentRef = useRef(false);
+  useEffect(() => {
+    if (!buildSeed || buildSentRef.current) return;
+    buildSentRef.current = true;
+    void send({
+      displayText: buildSeed.description,
+      request: flowId
+        ? { mode: 'build', instruction: buildSeed.description, graph, flowId }
+        : { mode: 'revise', instruction: buildSeed.description, graph, flowId },
+    });
+    // `graph`/`flowId` are read once for the seed turn — later edits must not
+    // re-fire it (guarded by the ref regardless).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildSeed, send]);
+
+  // Keep the transcript pinned to the newest message / streamed activity.
   // `scrollTo` is optional-chained: jsdom (tests) doesn't implement it.
   useEffect(() => {
     scrollRef.current?.scrollTo?.({ top: scrollRef.current.scrollHeight });
-  }, [messages, sending, proposal]);
+  }, [messages, sending, proposal, toolTimeline, liveResponse]);
 
   const submit = useCallback(
     async (raw?: string) => {
       const trimmed = (raw ?? text).trim();
       if (!trimmed || sending) return;
       setText('');
-      await send({ displayText: trimmed, prompt: buildRevisePrompt(trimmed, graph, flowId) });
+      await send({
+        displayText: trimmed,
+        request: { mode: 'revise', instruction: trimmed, graph, flowId },
+      });
     },
     [text, sending, send, graph, flowId]
   );
@@ -157,7 +218,10 @@ export default function WorkflowCopilotPanel({
   }, [onReject, clearProposal]);
 
   const diff = proposal ? diffGraphs(graph, proposal.graph as WorkflowGraph) : null;
-  const isEmpty = messages.length === 0 && !proposal && !sending && !error;
+  const hasTimeline = toolTimeline.length > 0;
+  const hasLiveText = liveResponse.trim().length > 0;
+  const isEmpty =
+    messages.length === 0 && !proposal && !sending && !error && !hasTimeline && !hasLiveText;
 
   return (
     <aside
@@ -206,7 +270,31 @@ export default function WorkflowCopilotPanel({
           )
         )}
 
-        {sending && (
+        {/* Live builder activity — the SHARED tool timeline (tool cards + the
+            streaming reply) the main chat uses, fed from the runtime's streamed
+            per-thread state. Renders nothing until the turn produces a tool
+            call. */}
+        {hasTimeline && (
+          <div data-testid="workflow-copilot-timeline">
+            <ToolTimelineBlock
+              entries={toolTimeline}
+              liveResponse={hasLiveText ? liveResponse : undefined}
+            />
+          </div>
+        )}
+
+        {/* Pre-tool phase: the reply is streaming but no tool has run yet, so the
+            timeline is still empty — surface the live text as an agent bubble so
+            the copilot never looks frozen. */}
+        {hasLiveText && !hasTimeline && (
+          <div
+            className="max-w-[92%] rounded-2xl bg-surface-subtle px-3 py-1.5"
+            data-testid="workflow-copilot-streaming">
+            <BubbleMarkdown content={liveResponse} />
+          </div>
+        )}
+
+        {sending && !hasTimeline && !hasLiveText && (
           <p className="text-xs text-content-muted" data-testid="workflow-copilot-thinking">
             {t('flows.copilot.thinking')}
           </p>

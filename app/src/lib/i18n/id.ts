@@ -3865,6 +3865,11 @@ const messages: TranslationMap = {
   'flows.nodeConfig.composio.customPlaceholder': 'SLUG_NAME',
   'flows.nodeConfig.agent.modelHint': 'Pilih tingkat kemampuan — workspace akan menentukan model.',
   'flows.nodeConfig.agent.modelInherit': 'Default (warisi)',
+  'flows.nodeConfig.agent.agentRefLabel': 'Agen',
+  'flows.nodeConfig.agent.agentRefHint':
+    'Jalankan node ini sebagai agen terdaftar — alat dan pengamannya berlaku.',
+  'flows.nodeConfig.agent.agentRefInherit': 'Bawaan (pembuat alur kerja)',
+  'flows.nodeConfig.agent.modelManagedTiers': 'Tingkat terkelola',
   'flows.nodeConfig.agent.modelHints': 'Petunjuk model',
   'flows.nodeConfig.agent.modelCustom': 'Model kustom…',
   'flows.nodeConfig.agent.modelCustomPlaceholder': 'mis. gpt-4o-mini',
@@ -3969,6 +3974,9 @@ const messages: TranslationMap = {
   'flows.templates.ask-agent.name': 'Tanya agen',
   'flows.templates.ask-agent.description':
     'Pemicu manual sederhana yang menyerahkan tugas ke agen.',
+  'flows.templates.opus-sonnet-brief.name': 'Ringkasan riset (Opus merencanakan, Sonnet menyusun)',
+  'flows.templates.opus-sonnet-brief.description':
+    'Agen tingkat penalaran merencanakan ringkasan, agen tingkat obrolan menyusunnya, lalu hasilnya dibentuk untuk Anda.',
 
   'oauth.button.connecting': 'Menghubungkan...',
   'oauth.button.loopbackTimeout':

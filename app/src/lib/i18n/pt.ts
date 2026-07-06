@@ -3916,6 +3916,11 @@ const messages: TranslationMap = {
   'flows.nodeConfig.agent.modelHint':
     'Escolha um nível de capacidade — o workspace resolve o modelo.',
   'flows.nodeConfig.agent.modelInherit': 'Padrão (herdar)',
+  'flows.nodeConfig.agent.agentRefLabel': 'Agente',
+  'flows.nodeConfig.agent.agentRefHint':
+    'Executar este nó como um agente registrado — suas ferramentas e proteções se aplicam.',
+  'flows.nodeConfig.agent.agentRefInherit': 'Padrão (construtor de fluxos)',
+  'flows.nodeConfig.agent.modelManagedTiers': 'Níveis gerenciados',
   'flows.nodeConfig.agent.modelHints': 'Dicas de modelo',
   'flows.nodeConfig.agent.modelCustom': 'Modelo personalizado…',
   'flows.nodeConfig.agent.modelCustomPlaceholder': 'ex.: gpt-4o-mini',
@@ -4021,6 +4026,9 @@ const messages: TranslationMap = {
   'flows.templates.ask-agent.name': 'Perguntar ao agente',
   'flows.templates.ask-agent.description':
     'Um acionador manual simples que entrega uma tarefa a um agente.',
+  'flows.templates.opus-sonnet-brief.name': 'Resumo de pesquisa (Opus planeja, Sonnet redige)',
+  'flows.templates.opus-sonnet-brief.description':
+    'Um agente de nível raciocínio planeja o resumo, um agente de nível chat o redige e, em seguida, o resultado é formatado para você.',
 
   'oauth.button.connecting': 'Conectando...',
   'oauth.button.loopbackTimeout':

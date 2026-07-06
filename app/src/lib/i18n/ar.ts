@@ -3768,6 +3768,10 @@ const messages: TranslationMap = {
   'flows.nodeConfig.composio.customPlaceholder': 'SLUG_NAME',
   'flows.nodeConfig.agent.modelHint': 'اختر مستوى القدرة — سيحدد مساحة العمل النموذج.',
   'flows.nodeConfig.agent.modelInherit': 'الافتراضي (موروث)',
+  'flows.nodeConfig.agent.agentRefLabel': 'الوكيل',
+  'flows.nodeConfig.agent.agentRefHint': 'شغّل هذه العقدة كوكيل مُسجَّل — تُطبَّق أدواته وضوابطه.',
+  'flows.nodeConfig.agent.agentRefInherit': 'افتراضي (مُنشئ سير العمل)',
+  'flows.nodeConfig.agent.modelManagedTiers': 'المستويات المُدارة',
   'flows.nodeConfig.agent.modelHints': 'تلميحات النموذج',
   'flows.nodeConfig.agent.modelCustom': 'نموذج مخصص…',
   'flows.nodeConfig.agent.modelCustomPlaceholder': 'مثل gpt-4o-mini',
@@ -3866,6 +3870,9 @@ const messages: TranslationMap = {
     'استدعِ نقطة نهاية HTTP عند الطلب وحلّل الاستجابة إلى شكل قابل للاستخدام.',
   'flows.templates.ask-agent.name': 'اسأل الوكيل',
   'flows.templates.ask-agent.description': 'مشغّل يدوي بسيط يسلّم مهمة إلى وكيل.',
+  'flows.templates.opus-sonnet-brief.name': 'موجز بحثي (Opus يخطّط، Sonnet يصيغ)',
+  'flows.templates.opus-sonnet-brief.description':
+    'وكيل من فئة الاستدلال يخطّط الموجز، ووكيل من فئة الدردشة يصيغه، ثم تُشكَّل النتيجة من أجلك.',
 
   'oauth.button.connecting': 'جارٍ الاتصال...',
   'oauth.button.loopbackTimeout':

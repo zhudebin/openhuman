@@ -4570,10 +4570,15 @@ const en: TranslationMap = {
   'flows.nodeConfig.http.bodyLabel': 'Body (JSON)',
   'flows.nodeConfig.agent.promptLabel': 'Prompt',
   'flows.nodeConfig.agent.promptPlaceholder': 'Instructions for the agent…',
+  'flows.nodeConfig.agent.agentRefLabel': 'Agent',
+  'flows.nodeConfig.agent.agentRefHint':
+    'Run this node as a registered agent — its tools and guardrails apply.',
+  'flows.nodeConfig.agent.agentRefInherit': 'Default (workflow builder)',
   'flows.nodeConfig.agent.modelLabel': 'Model',
   'flows.nodeConfig.agent.modelHint': 'Pick a capability tier — the workspace resolves the model.',
   'flows.nodeConfig.agent.modelInherit': 'Default (inherit)',
   'flows.nodeConfig.agent.modelHints': 'Model hints',
+  'flows.nodeConfig.agent.modelManagedTiers': 'Managed tiers',
   'flows.nodeConfig.agent.modelCustom': 'Custom model…',
   'flows.nodeConfig.agent.modelCustomPlaceholder': 'e.g. gpt-4o-mini',
   'flows.nodeConfig.tool.slugLabel': 'Action',
@@ -4645,6 +4650,9 @@ const en: TranslationMap = {
     'Call an HTTP endpoint on demand and parse the response into a usable shape.',
   'flows.templates.ask-agent.name': 'Ask the agent',
   'flows.templates.ask-agent.description': 'A simple manual trigger that hands a task to an agent.',
+  'flows.templates.opus-sonnet-brief.name': 'Research brief (Opus plans, Sonnet drafts)',
+  'flows.templates.opus-sonnet-brief.description':
+    'A reasoning-tier agent plans the brief, a chat-tier agent drafts it, then the result is shaped for you.',
 
   'oauth.button.connecting': 'Connecting...',
   'oauth.button.loopbackTimeout':

@@ -3656,6 +3656,10 @@ const messages: TranslationMap = {
   'flows.nodeConfig.composio.customPlaceholder': 'SLUG_NAME',
   'flows.nodeConfig.agent.modelHint': '选择能力层级，工作区会解析具体模型。',
   'flows.nodeConfig.agent.modelInherit': '默认（继承）',
+  'flows.nodeConfig.agent.agentRefLabel': '智能体',
+  'flows.nodeConfig.agent.agentRefHint': '将此节点作为已注册的智能体运行——其工具和防护措施将生效。',
+  'flows.nodeConfig.agent.agentRefInherit': '默认（工作流构建器）',
+  'flows.nodeConfig.agent.modelManagedTiers': '托管层级',
   'flows.nodeConfig.agent.modelHints': '模型提示',
   'flows.nodeConfig.agent.modelCustom': '自定义模型…',
   'flows.nodeConfig.agent.modelCustomPlaceholder': '例如 gpt-4o-mini',
@@ -3747,6 +3751,9 @@ const messages: TranslationMap = {
   'flows.templates.http-fetch-parse.description': '按需调用 HTTP 端点，并将响应解析为可用的结构。',
   'flows.templates.ask-agent.name': '询问智能体',
   'flows.templates.ask-agent.description': '一个简单的手动触发器，将任务交给智能体。',
+  'flows.templates.opus-sonnet-brief.name': '研究简报（Opus 规划，Sonnet 起草）',
+  'flows.templates.opus-sonnet-brief.description':
+    '推理层级的智能体规划简报，聊天层级的智能体起草，然后结果会为你整理成形。',
 
   'oauth.button.connecting': '连接中...',
   'oauth.button.loopbackTimeout': '登录超时 — 浏览器未完成 OAuth 跳转。请重试。',
