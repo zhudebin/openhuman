@@ -286,6 +286,11 @@ pub fn all_tools_with_runtime(
         Box::new(GetFlowRunTool::new(config.clone())),
         Box::new(ListFlowConnectionsTool::new(config.clone())),
         Box::new(SearchToolCatalogTool::new(config.clone())),
+        // Full live contract (schemas, real required_args/output_fields,
+        // primary_array_path) for one action slug found via
+        // search_tool_catalog — the grounding step before WIRING a node's
+        // args/downstream bindings (systemic tool-contract fix, Part 1).
+        Box::new(GetToolContractTool::new(config.clone())),
         // Ground an `agent` node's `agent_ref` in real registered agent-kind ids
         // (researcher / code_executor / …) — the agent analogue of
         // search_tool_catalog. Read-only.
