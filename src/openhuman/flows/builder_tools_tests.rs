@@ -58,6 +58,40 @@ async fn revise_workflow_validates_and_returns_revision_proposal() {
 }
 
 #[tokio::test]
+async fn revise_workflow_omitted_require_approval_defaults_false() {
+    let tmp = TempDir::new().unwrap();
+    let tool = ReviseWorkflowTool::new(test_config(&tmp));
+
+    let result = tool
+        .execute(json!({ "name": "Revised flow", "graph": valid_graph() }))
+        .await
+        .unwrap();
+
+    assert!(!result.is_error, "{}", result.output());
+    let parsed: Value = serde_json::from_str(&result.output()).unwrap();
+    assert_eq!(parsed["require_approval"], false);
+}
+
+#[tokio::test]
+async fn revise_workflow_explicit_require_approval_true_is_respected() {
+    let tmp = TempDir::new().unwrap();
+    let tool = ReviseWorkflowTool::new(test_config(&tmp));
+
+    let result = tool
+        .execute(json!({
+            "name": "Revised flow",
+            "graph": valid_graph(),
+            "require_approval": true
+        }))
+        .await
+        .unwrap();
+
+    assert!(!result.is_error, "{}", result.output());
+    let parsed: Value = serde_json::from_str(&result.output()).unwrap();
+    assert_eq!(parsed["require_approval"], true);
+}
+
+#[tokio::test]
 async fn revise_workflow_rejects_invalid_graph() {
     let tmp = TempDir::new().unwrap();
     let tool = ReviseWorkflowTool::new(test_config(&tmp));
