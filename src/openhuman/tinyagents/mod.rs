@@ -69,7 +69,6 @@ use crate::openhuman::agent::harness::tool_result_artifacts::{
 use crate::openhuman::agent::harness::{run_queue::RunQueue, MAX_SPAWN_DEPTH};
 use crate::openhuman::agent::progress::AgentProgress;
 use crate::openhuman::inference::provider::{ChatMessage, ConversationMessage, Provider};
-use model::ThinkingForwarder;
 
 #[allow(unused_imports)] // Wired into the recall/retrieval facade in workstream 09.2.
 pub(crate) use embeddings::ProviderEmbeddingModel;
@@ -451,9 +450,9 @@ fn is_subagent_spawn_or_delegate_tool(name: &str) -> bool {
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_turn_via_tinyagents_shared(
-    provider: Arc<dyn Provider>,
+    turn_models: TurnModels,
+    provider_id: String,
     model: &str,
-    temperature: f64,
     history: Vec<ChatMessage>,
     tool_sets: Vec<Arc<Vec<Box<dyn crate::openhuman::tools::Tool>>>>,
     allowed: Option<HashSet<String>>,
@@ -483,10 +482,10 @@ pub(crate) async fn run_turn_via_tinyagents_shared(
     // otherwise the harness model-call cap would be zero and abort the run before
     // the first provider call.
     let max_iterations = effective_max_iterations(max_iterations);
-    // Snapshot the provider's telemetry id before `provider` moves into the
-    // harness assembly — the event bridge stamps it on every per-call
-    // generation event (`{provider_id}.{model}` in Langfuse).
-    let provider_id = provider.telemetry_provider_id();
+    // The turn's crate `ChatModel` set (`turn_models`) and the provider telemetry
+    // id are built by the caller via `build_turn_models` — the seam entry is
+    // crate-native and no longer names `Provider` (issue #4249, Phase 5). The
+    // telemetry id (`{provider_id}.{model}` in Langfuse) rides in as a param.
     let AssembledTurnHarness {
         harness,
         cursor,
@@ -505,9 +504,8 @@ pub(crate) async fn run_turn_via_tinyagents_shared(
         compression_mw,
         prompt_cache_guard,
     } = assemble_turn_harness(
-        provider,
+        turn_models,
         model,
-        temperature,
         tool_sets,
         allowed,
         max_iterations,
@@ -1113,6 +1111,69 @@ fn tinyagents_depth_error(
     }
 }
 
+/// The per-turn crate [`ChatModel`](tinyagents::harness::model::ChatModel) set,
+/// built once from an openhuman [`Provider`] by [`build_turn_models`] — the
+/// single place a turn's `ProviderModel`s are constructed (issue #4249, Phase 5).
+///
+/// [`assemble_turn_harness`] takes this bundle instead of the raw provider, so
+/// the harness assembly is expressed purely in crate model types; the
+/// `Provider` → `ChatModel` adaptation is confined to `build_turn_models`.
+pub(crate) struct TurnModels {
+    /// The turn's effective/primary model (registry default + dispatch target).
+    primary: Arc<dyn tinyagents::harness::model::ChatModel<()>>,
+    /// Additive workload-tier routes (registry name → model), excluding the
+    /// primary; the crate registry resolves fallback/selection across them.
+    routes: Vec<(String, Arc<dyn tinyagents::harness::model::ChatModel<()>>)>,
+    /// A model for the context-window summarizer (a distinct adapter instance so
+    /// its provider errors don't touch the turn's `error_slot`).
+    summarizer: Arc<dyn tinyagents::harness::model::ChatModel<()>>,
+    /// Recovers the primary's original (downcastable) provider error on failure.
+    error_slot: crate::openhuman::tinyagents::model::ProviderErrorSlot,
+}
+
+/// Build the per-turn [`TurnModels`] from an openhuman [`Provider`] — the sole
+/// `ProviderModel` construction site for a turn (issue #4249, Phase 5). The
+/// primary carries the model's context window on its capability profile; the
+/// workload-tier routes are projected via [`routes::build_route_models`]; the
+/// summarizer is a separate adapter over the same provider/model.
+pub(crate) fn build_turn_models(
+    provider: Arc<dyn Provider>,
+    model: &str,
+    temperature: f64,
+    context_window: Option<u64>,
+) -> TurnModels {
+    let summary_provider = provider.clone();
+    let mut primary = ProviderModel::new(provider, model, temperature);
+    // Record the model's context window on its capability profile (issue #4249,
+    // Phase 2) so the crate can validate input capacity before dispatch. The
+    // per-call output cap rides `RunConfig.max_turn_output_tokens` instead.
+    if let Some(window) = context_window.filter(|w| *w > 0) {
+        primary = primary.with_context_window(window);
+    }
+    let error_slot = primary.error_slot();
+    let primary: Arc<dyn tinyagents::harness::model::ChatModel<()>> = Arc::new(primary);
+
+    let routes = routes::build_route_models(&summary_provider, temperature, model)
+        .into_iter()
+        .map(|route| {
+            let model: Arc<dyn tinyagents::harness::model::ChatModel<()>> = route.model;
+            (route.name, model)
+        })
+        .collect();
+
+    // A distinct adapter instance for the summarizer (own error_slot), matching
+    // the pre-Phase-5 separate `summary_provider` clone.
+    let summarizer: Arc<dyn tinyagents::harness::model::ChatModel<()>> =
+        Arc::new(ProviderModel::new(summary_provider, model, temperature));
+
+    TurnModels {
+        primary,
+        routes,
+        summarizer,
+        error_slot,
+    }
+}
+
 /// Everything [`assemble_turn_harness`] wires up for one turn: the configured
 /// harness plus the shared slots/handles the run loop reads after the drive
 /// future returns.
@@ -1177,9 +1238,8 @@ struct AssembledTurnHarness {
 /// exposes the harness registries without driving a run.
 #[allow(clippy::too_many_arguments)]
 fn assemble_turn_harness(
-    provider: Arc<dyn Provider>,
+    turn_models: TurnModels,
     model: &str,
-    temperature: f64,
     tool_sets: Vec<Arc<Vec<Box<dyn crate::openhuman::tools::Tool>>>>,
     allowed: Option<HashSet<String>>,
     max_iterations: usize,
@@ -1228,60 +1288,46 @@ fn assemble_turn_harness(
     // tool-call start (the crate `ToolDelta` carries none), the bridge reads it
     // to label the argument fragments now streamed via `MessageDelta.tool_call`.
     let tool_names: ToolNameMap = Arc::default();
-    // Shared FIFO carry of per-call provider `UsageInfo`: the model adapter
-    // pushes each successful response's usage (charged USD + context window +
-    // cache-creation/reasoning tokens the crate `Usage` drops), the event bridge
-    // pops it when recording that call's usage (#4467, item 1).
+    // Shared FIFO carry of per-call provider `UsageInfo`: `UsageCarryMiddleware`
+    // pushes each response's usage (charged USD + context window +
+    // cache-creation/reasoning tokens, read off the response via G1), the event
+    // bridge pops it when recording that call's usage (#4467, item 1). The carry
+    // is produced by a wrap-model middleware now, not the adapter, so route models
+    // carry no usage side-channel (Phase 5).
     let provider_usage_carry: ProviderUsageCarry = Arc::default();
-    // Keep a provider handle for the context-window summarizer (the run consumes
-    // the other clone into the `ProviderModel`).
-    let summary_provider = provider.clone();
-    let mut provider_model = ProviderModel::new(provider, model, temperature)
-        .with_usage_carry(provider_usage_carry.clone());
-    // The per-call output cap now rides `RunConfig.max_turn_output_tokens`
-    // (Phase 5 groundwork), set by the caller: the loop stamps it onto every
-    // `ModelRequest` and the adapter honors `request.max_tokens`, so the cap no
-    // longer needs to be baked into the primary model or each route model.
-    // Record the model's context window on its capability profile (issue #4249,
-    // Phase 2) so the crate can validate input capacity before dispatch.
-    if let Some(window) = context_window.filter(|w| *w > 0) {
-        provider_model = provider_model.with_context_window(window);
-    }
-    if let Some(tx) = &on_progress {
-        provider_model = provider_model.with_thinking(ThinkingForwarder::new(
-            tx.clone(),
-            subagent_scope.clone(),
-            cursor.clone(),
-            tool_names.clone(),
-        ));
-    }
-    // Recover the original (downcastable) provider error if the run fails — the
-    // harness only carries a stringified copy.
-    let error_slot = provider_model.error_slot();
-    let provider_model = Arc::new(provider_model);
-    capability_registry.replace_model(model, provider_model.clone());
+    // The turn's models are pre-built by `build_turn_models` (the single
+    // `ProviderModel` construction site) and handed in as crate `ChatModel`s —
+    // the assembly no longer touches the raw provider (issue #4249, Phase 5).
+    let TurnModels {
+        primary,
+        routes,
+        summarizer: summarizer_model,
+        error_slot,
+    } = turn_models;
+    capability_registry.replace_model(model, primary.clone());
     harness
-        .register_model(model, provider_model)
+        .register_model(model, primary)
         .set_default_model(model);
 
     // Project the full workload-route set into the registry (issue #4249,
     // Workstream 02.1). Each route is an additive registry entry carrying its
     // per-route capability profile; `set_default_model` above keeps the turn's
     // effective model as the dispatch target, so behavior is preserved until
-    // fallback/selection (02.2) chooses among the routes. `summary_provider` is
-    // the retained provider handle (the other clone was consumed into the
-    // primary `ProviderModel`); `build_route_models` clones it per route and
-    // skips the turn's own model so we don't shadow the default.
-    for route in
-        routes::build_route_models(&summary_provider, temperature, model, &provider_usage_carry)
-    {
-        let routes::RouteModel {
-            name,
-            model: route_model,
-        } = route;
+    // fallback/selection (02.2) chooses among the routes. `build_turn_models`
+    // already skipped the turn's own model, so we don't shadow the default.
+    for (name, route_model) in routes {
         capability_registry.replace_model(name.as_str(), route_model.clone());
         harness.register_model(name, route_model);
     }
+
+    // Cost usage capture (issue #4249, Phase 5): feed the event bridge's usage
+    // carry from a wrap-model middleware that reads the full `UsageInfo` off each
+    // response, instead of every `ProviderModel` pushing it. Installed
+    // unconditionally — usage flows on every turn — and shares the same carry the
+    // bridge drains on `UsageRecorded`.
+    harness.push_model_middleware(Arc::new(routes::UsageCarryMiddleware::new(
+        provider_usage_carry.clone(),
+    )));
 
     // Per-call capability gate (issue #4249, Workstream 02.1): when the turn has
     // derivable capability needs (today: vision for a `vision-v1` turn), stamp
@@ -1705,9 +1751,8 @@ fn assemble_turn_harness(
             // identical re-issued input slice must not re-run the summarizer LLM.
             let summarizer = summarize::FaultTolerantCachingSummarizer::new(
                 Box::new(summarize::ProviderModelSummarizer::new(
-                    summary_provider,
+                    summarizer_model,
                     model,
-                    temperature,
                 )),
                 &policy,
             );

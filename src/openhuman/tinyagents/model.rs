@@ -7,7 +7,6 @@
 //! translate the [`ChatResponse`] back into a harness [`ModelResponse`] —
 //! carrying through text, native tool calls, and token usage.
 
-use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -17,110 +16,15 @@ use tinyagents::harness::model::{
 };
 use tinyagents::harness::tool::{ToolCall as TaToolCall, ToolDelta};
 use tinyagents::harness::usage::Usage;
-use tokio::sync::mpsc::{Sender, UnboundedSender};
+use tokio::sync::mpsc::UnboundedSender;
 
 use super::abort_guard::AbortOnDrop;
-use super::observability::{IterationCursor, ProviderUsageCarry, SubagentScope, ToolNameMap};
-use crate::openhuman::agent::progress::AgentProgress;
 use crate::openhuman::inference::provider::thread_context::{current_thread_id, with_thread_id};
 use crate::openhuman::inference::provider::{
     current_route_slot, with_route_slot, ChatMessage, ChatRequest, ChatResponse, Provider,
     ProviderDelta, UsageInfo,
 };
 use crate::openhuman::tools::ToolSpec;
-
-/// Out-of-band forwarder for progress events that do not yet round-trip through
-/// tinyagents with OpenHuman parity: non-streaming post-hoc reasoning and the
-/// tool-call **start** marker (tool name).
-///
-/// Streaming reasoning now rides tinyagents' native `MessageDelta.reasoning`
-/// channel, and the incremental tool-call **argument** fragments ride the native
-/// `MessageDelta.tool_call` channel (crate `ToolDelta`); both are projected by
-/// [`OpenhumanEventBridge`](super::OpenhumanEventBridge). What remains here is
-/// the split the crate can't express: the crate `ToolDelta` has only
-/// `call_id`/`content` (no `tool_name`), so the tool-call **start** event — the
-/// empty-delta `ToolCallArgsDelta` that carries the tool name and opens the UI
-/// timeline row — is still emitted straight onto the progress sink, and the
-/// learned `call_id → tool_name` map is *shared* with the bridge (via
-/// [`ToolNameMap`]) so it can label the argument fragments it now projects off
-/// the crate stream. This forwarder also still emits non-streaming post-hoc
-/// reasoning (see [`ProviderModel::invoke`]). It shares the bridge's
-/// [`IterationCursor`] so each event is attributed to the right model call.
-/// Parent runs emit the top-level variants; child runs emit the `Subagent`
-/// counterpart for thinking. Tool-arg/start events have no child variant, so
-/// they ride the top-level event.
-#[derive(Clone)]
-pub(super) struct ThinkingForwarder {
-    sink: Sender<AgentProgress>,
-    scope: Option<SubagentScope>,
-    cursor: IterationCursor,
-    /// call_id → tool_name, learned from `ToolCallStart`. Shared with the
-    /// [`OpenhumanEventBridge`](super::OpenhumanEventBridge) so the streamed
-    /// argument fragments (which ride the crate `ToolDelta`, sans name) can be
-    /// labelled with the tool the UI shows.
-    tool_names: ToolNameMap,
-}
-
-impl ThinkingForwarder {
-    pub(super) fn new(
-        sink: Sender<AgentProgress>,
-        scope: Option<SubagentScope>,
-        cursor: IterationCursor,
-        tool_names: ToolNameMap,
-    ) -> Self {
-        Self {
-            sink,
-            scope,
-            cursor,
-            tool_names,
-        }
-    }
-
-    /// Best-effort, non-blocking emit of one reasoning chunk (drops on a full
-    /// channel, matching the streaming text path).
-    fn emit(&self, delta: String) {
-        if delta.is_empty() {
-            return;
-        }
-        let iteration = self.cursor.load(Ordering::SeqCst);
-        let progress = match &self.scope {
-            None => AgentProgress::ThinkingDelta { delta, iteration },
-            Some(s) => AgentProgress::SubagentThinkingDelta {
-                agent_id: s.agent_id.clone(),
-                task_id: s.task_id.clone(),
-                delta,
-                iteration,
-            },
-        };
-        let _ = self.sink.try_send(progress);
-    }
-
-    /// Record the tool name a streaming tool call starts with (into the map
-    /// shared with the bridge, so it can label the argument fragments it
-    /// projects off the crate stream), and emit the start marker — an
-    /// empty-delta `ToolCallArgsDelta` — so consumers see the call begin before
-    /// its arguments arrive (matching the legacy `ProviderDelta::ToolCallStart`
-    /// mapping). The crate `ToolDelta` has no `tool_name` field, so this half of
-    /// the tool-arg contract can't ride the crate stream and stays here.
-    fn note_tool_call(&self, call_id: String, tool_name: String) {
-        self.tool_names
-            .lock()
-            .unwrap()
-            .insert(call_id.clone(), tool_name.clone());
-        tracing::trace!(
-            call_id = call_id.as_str(),
-            tool_name = tool_name.as_str(),
-            child = self.scope.is_some(),
-            "[stream] tool-call start marker (name recorded for crate-stream arg fragments)"
-        );
-        let _ = self.sink.try_send(AgentProgress::ToolCallArgsDelta {
-            call_id,
-            tool_name,
-            delta: String::new(),
-            iteration: self.cursor.load(Ordering::SeqCst),
-        });
-    }
-}
 
 /// Translate a harness [`ModelRequest`] into openhuman's message list + tool
 /// specs (shared by the buffered and streaming paths).
@@ -346,19 +250,17 @@ pub(crate) fn usage_info_from_response(response: &ModelResponse) -> Option<Usage
 /// the [`OpenhumanEventBridge`](super::OpenhumanEventBridge) mirrors them as
 /// progress deltas from the crate stream alone): text/reasoning as
 /// [`MessageDelta`], and each argument fragment as
-/// [`ModelStreamItem::ToolCallDelta`] correlated by `call_id`. The crate
-/// `ToolDelta` has no `tool_name`, so the tool-call **start** marker (which
-/// carries the name and opens the UI timeline row) still rides the out-of-band
-/// [`ThinkingForwarder`]; it also records the name into the map shared with the
-/// bridge so the streamed fragments stay labelled. The model adapter still
-/// assembles the final native tool calls from the `Completed` response (the
-/// `StreamAccumulator` treats it as authoritative), so these fragments are
-/// progress-only — the UI can show the call being composed.
-fn forward_delta(
-    tx: &UnboundedSender<ModelStreamItem>,
-    thinking: Option<&ThinkingForwarder>,
-    delta: ProviderDelta,
-) {
+/// [`ModelStreamItem::ToolCallDelta`] correlated by `call_id`. The tool-call
+/// **start** marker now also rides the native stream: with the crate `ToolDelta`
+/// carrying an optional `tool_name` (G2), the call-opening delta is a
+/// `ToolCallDelta` with the name set and empty content, so the
+/// [`OpenhumanEventBridge`](super::OpenhumanEventBridge) records the name and
+/// opens the UI timeline row off the crate stream alone — no out-of-band
+/// forwarder. The model adapter still assembles the final native tool calls from
+/// the `Completed` response (the `StreamAccumulator` treats it as
+/// authoritative), so these fragments are progress-only — the UI can show the
+/// call being composed.
+fn forward_delta(tx: &UnboundedSender<ModelStreamItem>, delta: ProviderDelta) {
     match delta {
         ProviderDelta::TextDelta { delta } => {
             if !delta.is_empty() {
@@ -373,9 +275,19 @@ fn forward_delta(
             }
         }
         ProviderDelta::ToolCallStart { call_id, tool_name } => {
-            if let Some(forwarder) = thinking {
-                forwarder.note_tool_call(call_id, tool_name);
-            }
+            // Call-opening marker: name set, empty content. Rides the native
+            // crate stream (G2) so the bridge can label the call before its
+            // arguments arrive.
+            tracing::trace!(
+                call_id = call_id.as_str(),
+                tool_name = tool_name.as_str(),
+                "[stream] forwarding tool-call start onto crate ToolCallDelta"
+            );
+            let _ = tx.send(ModelStreamItem::ToolCallDelta(ToolDelta {
+                call_id,
+                content: String::new(),
+                tool_name: Some(tool_name),
+            }));
         }
         ProviderDelta::ToolCallArgsDelta { call_id, delta } => {
             if !delta.is_empty() {
@@ -387,6 +299,7 @@ fn forward_delta(
                 let _ = tx.send(ModelStreamItem::ToolCallDelta(ToolDelta {
                     call_id,
                     content: delta,
+                    tool_name: None,
                 }));
             }
         }
@@ -413,17 +326,8 @@ pub(super) struct ProviderModel {
     model: String,
     temperature: f64,
     max_tokens: Option<u32>,
-    /// When set, the adapter forwards tool-argument progress and post-hoc
-    /// non-streaming reasoning onto the progress sink.
-    thinking: Option<ThinkingForwarder>,
     /// Preserves the last original provider error for the runner to re-surface.
     error_slot: ProviderErrorSlot,
-    /// FIFO side-channel shared with the event bridge: on each successful chat
-    /// response the adapter pushes the provider `UsageInfo` (which carries the
-    /// backend-charged USD + context window + cache-creation/reasoning tokens
-    /// the crate `Usage` mapping drops), and the bridge pops it when recording
-    /// that call's usage — restoring charged-USD precedence (#4467, item 1).
-    usage_carry: ProviderUsageCarry,
     /// Capability profile derived from the wrapped provider (issue #4249,
     /// Phase 2): lets the crate validate a request against the model's actual
     /// capabilities (vision, tool calling, streaming, token limits) *before*
@@ -490,9 +394,7 @@ impl ProviderModel {
             model,
             temperature,
             max_tokens: None,
-            thinking: None,
             error_slot: Arc::new(Mutex::new(None)),
-            usage_carry: Arc::default(),
             profile,
         }
     }
@@ -501,14 +403,6 @@ impl ProviderModel {
     /// harness, so the runner can recover the typed provider error on failure).
     pub(super) fn error_slot(&self) -> ProviderErrorSlot {
         self.error_slot.clone()
-    }
-
-    /// Attach the shared provider-usage carry the event bridge drains, so the
-    /// backend-charged USD + context window this adapter observes reach the cost
-    /// accounting (#4467, item 1). Clone the same handle into the bridge.
-    pub(super) fn with_usage_carry(mut self, carry: ProviderUsageCarry) -> Self {
-        self.usage_carry = carry;
-        self
     }
 
     /// Cap the output tokens requested from the provider for every call.
@@ -545,13 +439,6 @@ impl ProviderModel {
     /// a request that requires reasoning resolves to a reasoning-capable model.
     pub(super) fn with_reasoning(mut self, reasoning: bool) -> Self {
         self.profile.reasoning = reasoning;
-        self
-    }
-
-    /// Forward provider thinking/tool-argument progress onto a progress sink via
-    /// `forwarder` (parent or sub-agent scoped). See [`ThinkingForwarder`].
-    pub(super) fn with_thinking(mut self, forwarder: ThinkingForwarder) -> Self {
-        self.thinking = Some(forwarder);
         self
     }
 }
@@ -649,27 +536,15 @@ impl ChatModel<()> for ProviderModel {
                 });
             }
         };
-        // Non-streaming path: surface any reasoning the provider returned as a
-        // single post-hoc thinking delta (it had no per-token channel to ride).
-        if let Some(forwarder) = &self.thinking {
-            if let Some(reasoning) = response
-                .reasoning_content
-                .as_ref()
-                .filter(|r| !r.is_empty())
-            {
-                forwarder.emit(reasoning.clone());
-            }
-        }
-        // Push this call's provider usage onto the shared carry so the event
-        // bridge records charged USD / context window with provider precedence
-        // (#4467, item 1). One push per successful response, matching the single
-        // `UsageRecorded` the crate emits for this call.
-        if let Some(u) = &response.usage {
-            self.usage_carry
-                .lock()
-                .unwrap_or_else(|p| p.into_inner())
-                .push_back(u.clone());
-        }
+        // The buffered path is used only for unobserved turns (no progress sink):
+        // the seam sets `streaming = on_progress.is_some()`, so any post-hoc
+        // reasoning here would have nowhere to go. Observed turns take `stream()`,
+        // which forwards reasoning natively. Reasoning still rides the response as
+        // a typed thinking block (see `response_to_model_response`) for
+        // persistence/replay.
+        // Provider usage (charged USD / context window / cache-creation-reasoning)
+        // now reaches the event bridge via `UsageCarryMiddleware`, which reads it
+        // off the returned `ModelResponse` (G1) — the adapter no longer carries it.
         Ok(response_to_model_response(&response, &pformat_registry))
     }
 
@@ -695,12 +570,7 @@ impl ChatModel<()> for ProviderModel {
         let temperature = request.temperature.unwrap_or(self.temperature);
         // Same precedence for the output cap (see `invoke`).
         let max_tokens = request.max_tokens.or(self.max_tokens);
-        let thinking = self.thinking.clone();
         let error_slot = self.error_slot.clone();
-        // Captured for the spawned producer (task-locals/`self` do not cross the
-        // spawn): the streaming path pushes provider usage onto the same carry
-        // the buffered path uses, so charged USD reaches the bridge (#4467, item 1).
-        let usage_carry = self.usage_carry.clone();
 
         let (item_tx, item_rx) = tokio::sync::mpsc::unbounded_channel::<ModelStreamItem>();
 
@@ -752,7 +622,7 @@ impl ChatModel<()> for ProviderModel {
                     maybe = delta_rx.recv() => {
                         if let Some(delta) = maybe {
                             streamed_thinking |= matches!(delta, ProviderDelta::ThinkingDelta { .. });
-                            forward_delta(&item_tx, thinking.as_ref(), delta);
+                            forward_delta(&item_tx, delta);
                         }
                     }
                     res = &mut chat_fut => break res,
@@ -761,7 +631,7 @@ impl ChatModel<()> for ProviderModel {
             // Drain any deltas that landed before the call returned.
             while let Ok(delta) = delta_rx.try_recv() {
                 streamed_thinking |= matches!(delta, ProviderDelta::ThinkingDelta { .. });
-                forward_delta(&item_tx, thinking.as_ref(), delta);
+                forward_delta(&item_tx, delta);
             }
 
             let terminal = match response {
@@ -789,15 +659,9 @@ impl ChatModel<()> for ProviderModel {
                             ));
                         }
                     }
-                    // Push provider usage onto the shared carry (#4467, item 1),
-                    // mirroring the buffered path — before building the terminal
-                    // item, so it is queued ahead of the crate `UsageRecorded`.
-                    if let Some(u) = &resp.usage {
-                        usage_carry
-                            .lock()
-                            .unwrap_or_else(|p| p.into_inner())
-                            .push_back(u.clone());
-                    }
+                    // Provider usage rides the `Completed` response's crate `Usage`
+                    // + raw (G1); `UsageCarryMiddleware` reads it off the folded
+                    // response for the bridge, so the adapter no longer pushes here.
                     ModelStreamItem::Completed(response_to_model_response(&resp, &pformat_registry))
                 }
                 Err(e) => {
