@@ -60,12 +60,24 @@ export interface UseWorkflowBuilderChat {
   /** The latest proposal the agent returned on this thread, or `null`. */
   proposal: WorkflowProposal | null;
   /**
-   * The dedicated thread's transcript (user + agent turns) so a caller can
-   * render the full conversation, not just the latest proposal. Empty until the
-   * first send. Sourced from the same `messagesByThreadId` store the main chat
-   * transcript reads.
+   * The dedicated thread's FULL transcript (user + agent turns, including
+   * between-tool narration bubbles) so a caller that needs the complete
+   * history can still get it. Empty until the first send. Sourced from the
+   * same `messagesByThreadId` store the main chat transcript reads. Most
+   * callers should render `displayMessages` instead (see below).
    */
   messages: ThreadMessage[];
+  /**
+   * `messages` filtered for RENDERING as chat bubbles: drops agent messages
+   * tagged `extraMetadata.isInterim` (the between-tool "Let me check…/Now let
+   * me build…" narration `ChatRuntimeProvider`'s `onInterim` persists) since
+   * that narration already renders live via `toolTimeline`/`liveResponse`
+   * below — showing it again as a bubble double-renders it. User messages and
+   * any non-interim agent message (the turn's terminal answer, including a
+   * clarifying question appended via the `assistantText` fallback in `send`)
+   * are always kept.
+   */
+  displayMessages: ThreadMessage[];
   /**
    * The dedicated thread's live tool timeline (streamed by `ChatRuntimeProvider`
    * as the builder turn runs) — bound straight into the shared
@@ -130,6 +142,16 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
   const messages = useMemo(
     () => (threadId ? (messagesByThreadId[threadId] ?? EMPTY_MESSAGES) : EMPTY_MESSAGES),
     [threadId, messagesByThreadId]
+  );
+
+  // Render-layer filter: drop interim narration bubbles (already shown live
+  // via `toolTimeline`/`liveResponse`), keeping every user turn and every
+  // non-interim agent turn (the terminal answer for a round, including a
+  // clarifying question with no `isInterim` tag). `messages` itself stays the
+  // full set — any future persistence/rehydration needs it intact.
+  const displayMessages = useMemo(
+    () => messages.filter(m => m.sender === 'user' || !m.extraMetadata?.isInterim),
+    [messages]
   );
 
   const toolTimeline = useMemo(
@@ -261,6 +283,7 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
     sending,
     proposal,
     messages,
+    displayMessages,
     toolTimeline,
     liveResponse,
     error,

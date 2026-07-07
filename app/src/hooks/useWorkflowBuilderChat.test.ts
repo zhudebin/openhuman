@@ -267,4 +267,39 @@ describe('useWorkflowBuilderChat', () => {
     });
     await waitFor(() => expect(result.current.error).toBe('run failed'));
   });
+
+  describe('displayMessages', () => {
+    it('excludes isInterim agent messages but keeps user + terminal agent messages (incl. a clarifying question)', () => {
+      selectorState.messagesByThreadId = {
+        'builder-1': [
+          { id: 'm1', sender: 'user', content: 'build me a digest', extraMetadata: {} },
+          {
+            id: 'm2',
+            sender: 'agent',
+            content: 'Let me check your calendar first.',
+            extraMetadata: { isInterim: true, requestId: 'r1' },
+          },
+          {
+            id: 'm3',
+            sender: 'agent',
+            content: 'Now let me build the workflow.',
+            extraMetadata: { isInterim: true, requestId: 'r1' },
+          },
+          // The #4630-style clarifying question is appended via
+          // `addMessageLocal` (the `send` fallback branch), never through
+          // `onInterim` — so it carries no `isInterim` tag and must still
+          // render as a bubble.
+          {
+            id: 'm4',
+            sender: 'agent',
+            content: 'Which Slack channel — #eng or #sales?',
+            extraMetadata: {},
+          },
+        ] as ThreadMessage[],
+      };
+      const { result } = renderHook(() => useWorkflowBuilderChat('builder-1'));
+      expect(result.current.messages).toHaveLength(4);
+      expect(result.current.displayMessages.map(m => m.id)).toEqual(['m1', 'm4']);
+    });
+  });
 });
