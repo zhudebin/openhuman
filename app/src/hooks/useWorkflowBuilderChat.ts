@@ -26,6 +26,7 @@ import createDebug from 'debug';
 import { useCallback, useMemo, useState } from 'react';
 
 import { type BuilderTurnRequest, buildWorkflow } from '../services/api/flowsApi';
+import { store } from '../store';
 import {
   clearWorkflowProposalForThread,
   setWorkflowProposalForThread,
@@ -79,8 +80,16 @@ export interface UseWorkflowBuilderChat {
   liveResponse: string;
   /** Last send error (thread create / RPC failure), or `null`. */
   error: string | null;
-  /** Send a builder turn, creating the dedicated thread on first use. */
-  send: (params: WorkflowBuilderSendParams) => Promise<void>;
+  /**
+   * Send a builder turn, creating the dedicated thread on first use. Resolves
+   * with `proposed: true` iff this turn's `flows_build` call returned a
+   * proposal — `false` for a clarifying question, an error, or a call that
+   * never ran (already sending / offline). Callers that loop a conversation
+   * (the copilot's free-text follow-ups) use this to know whether the turn's
+   * instruction is still "unresolved" and must be carried into the next turn
+   * — see `WorkflowCopilotPanel`'s `pendingAskRef`.
+   */
+  send: (params: WorkflowBuilderSendParams) => Promise<{ proposed: boolean }>;
   /** Clear the current proposal (e.g. after Accept/Reject) without persisting. */
   clearProposal: () => void;
 }
@@ -141,16 +150,17 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
     async ({ displayText, request }: WorkflowBuilderSendParams) => {
       if (localSending) {
         log('send: ignored — a turn is already dispatching');
-        return;
+        return { proposed: false };
       }
       if (socketStatus !== 'connected') {
         log('send: blocked — socket not connected (%s)', socketStatus);
         setError('offline');
-        return;
+        return { proposed: false };
       }
       setLocalSending(true);
       setError(null);
       let targetThreadId = threadId;
+      let proposed = false;
       try {
         if (!targetThreadId) {
           log('send: creating dedicated builder thread');
@@ -178,9 +188,10 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
         // text/thinking/tool events + a terminal `chat_done` keyed by it. The
         // GLOBAL `ChatRuntimeProvider` owns that transcript — it appends the
         // final assistant message on `chat_done` and fills the streaming/tool
-        // slices as the turn runs — so this hook must NOT also append the agent
-        // reply (doing so would double it). We still await the blocking result
-        // for its `proposal`/`error` fallback.
+        // slices as the turn runs, so in the normal (streaming-wired) case this
+        // hook must NOT also append the agent reply (doing so would double
+        // it) — see the dedup check below. We still await the blocking result
+        // for its `proposal`/`error`/`assistantText` fallback.
         log('send: running flows_build thread=%s mode=%s', targetThreadId, request.mode);
         const result = await buildWorkflow(request, targetThreadId);
 
@@ -190,11 +201,44 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
         // `pendingWorkflowProposalsByThread` from the tool result; re-writing the
         // same value here is idempotent and covers a missed socket event / CLI.
         if (result.proposal) {
+          proposed = true;
           dispatch(
             setWorkflowProposalForThread({ threadId: targetThreadId, proposal: result.proposal })
           );
         } else if (result.error) {
           setError(result.error);
+        } else if (result.assistantText?.trim()) {
+          // Neither a proposal nor an error: the agent replied with plain
+          // text instead of proposing this turn — most commonly a clarifying
+          // question (the "ask" branch of the clarify/verify posture). When
+          // streaming is wired (the normal case) `ChatRuntimeProvider` already
+          // appended this exact text on the turn's `chat_done` — the Rust
+          // side (`finalize_flow_stream`) delivers it unconditionally,
+          // independent of whether a proposal was made — so re-appending here
+          // would double the bubble. Read the live store (not the stale
+          // closed-over `messages`) to check whether that already landed;
+          // only append when it hasn't, which is the actual fallback case
+          // (streaming not wired: CLI / tests / a missed socket event).
+          const latest = store.getState().thread.messagesByThreadId[targetThreadId] ?? [];
+          const lastMessage = latest[latest.length - 1];
+          const alreadyStreamed =
+            lastMessage?.sender === 'agent' && lastMessage.content === result.assistantText;
+          log(
+            'send: assistantText fallback thread=%s alreadyStreamed=%s',
+            targetThreadId,
+            alreadyStreamed
+          );
+          if (!alreadyStreamed) {
+            const assistantMessage: ThreadMessage = {
+              id: `msg_${globalThis.crypto.randomUUID()}`,
+              content: result.assistantText,
+              type: 'text',
+              extraMetadata: {},
+              sender: 'agent',
+              createdAt: new Date().toISOString(),
+            };
+            dispatch(addMessageLocal({ threadId: targetThreadId, message: assistantMessage }));
+          }
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -203,6 +247,7 @@ export function useWorkflowBuilderChat(seedThreadId?: string | null): UseWorkflo
       } finally {
         setLocalSending(false);
       }
+      return { proposed };
     },
     [dispatch, localSending, socketStatus, threadId]
   );

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WorkflowGraph, WorkflowNode } from '../../lib/flows/types';
@@ -45,7 +45,7 @@ describe('WorkflowCopilotPanel', () => {
     hookState.toolTimeline = [];
     hookState.liveResponse = '';
     hookState.error = null;
-    hookState.send = vi.fn().mockResolvedValue(undefined);
+    hookState.send = vi.fn().mockResolvedValue({ proposed: false });
     hookState.clearProposal = vi.fn();
   });
 
@@ -74,6 +74,65 @@ describe('WorkflowCopilotPanel', () => {
     expect(arg.request.mode).toBe('revise');
     expect(arg.request.instruction).toBe('add a Slack notification on failure');
     expect(arg.request.graph).toEqual(baseGraph);
+  });
+
+  it('carries the original ask forward across a clarifying-question turn, then drops it once a proposal lands', async () => {
+    hookState.send = vi
+      .fn()
+      // Turn 1: the agent asks a clarifying question instead of proposing.
+      .mockResolvedValueOnce({ proposed: false })
+      // Turn 2: the user's answer resolves it and a proposal lands.
+      .mockResolvedValueOnce({ proposed: true })
+      // Turn 3 (and any further calls): a normal revise turn, already resolved.
+      .mockResolvedValue({ proposed: true });
+
+    render(
+      <WorkflowCopilotPanel
+        graph={baseGraph}
+        onProposal={vi.fn()}
+        onAccept={vi.fn()}
+        onReject={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('flows.copilot.placeholder'), {
+      target: { value: 'post a daily summary to slack' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('send-message-button'));
+      // Flush the microtasks `submit` awaits before it records `pendingAskRef`.
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(hookState.send).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByPlaceholderText('flows.copilot.placeholder'), {
+      target: { value: '#eng' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('send-message-button'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(hookState.send).toHaveBeenCalledTimes(2);
+    const secondArg = hookState.send.mock.calls[1][0];
+    // The follow-up must carry the ORIGINAL ask forward — a bare "#eng" alone
+    // would strand the agent with no idea what it was asked to build (the
+    // current graph is still blank/unchanged since no proposal has landed).
+    expect(secondArg.request.mode).toBe('revise');
+    expect(secondArg.request.instruction).toContain('post a daily summary to slack');
+    expect(secondArg.request.instruction).toContain('#eng');
+
+    // Turn 3, after a proposal has landed: the graph itself now carries the
+    // state, so the original ask must NOT be repeated.
+    fireEvent.change(screen.getByPlaceholderText('flows.copilot.placeholder'), {
+      target: { value: 'also add a filter step' },
+    });
+    fireEvent.click(screen.getByTestId('send-message-button'));
+    expect(hookState.send).toHaveBeenCalledTimes(3);
+    const thirdArg = hookState.send.mock.calls[2][0];
+    expect(thirdArg.request.instruction).toBe('also add a filter step');
   });
 
   it('renders the conversation transcript (user + agent turns)', () => {
@@ -252,5 +311,45 @@ describe('WorkflowCopilotPanel', () => {
       />
     );
     expect(hookState.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries the build seed description forward when the auto-sent build turn asks a clarifying question instead of proposing', async () => {
+    hookState.send = vi
+      .fn()
+      // The auto-sent build turn asks a question rather than proposing.
+      .mockResolvedValueOnce({ proposed: false })
+      // The user's free-text answer then resolves it.
+      .mockResolvedValueOnce({ proposed: true });
+
+    render(
+      <WorkflowCopilotPanel
+        graph={baseGraph}
+        flowId="flow-1"
+        onProposal={vi.fn()}
+        onAccept={vi.fn()}
+        onReject={vi.fn()}
+        onClose={vi.fn()}
+        buildSeed={{ description: 'post a daily summary to slack' }}
+      />
+    );
+    // Flush the microtasks the seed effect awaits before recording
+    // `pendingAskRef` from the resolved `{ proposed: false }`.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(hookState.send).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByPlaceholderText('flows.copilot.placeholder'), {
+      target: { value: '#eng' },
+    });
+    fireEvent.click(screen.getByTestId('send-message-button'));
+
+    expect(hookState.send).toHaveBeenCalledTimes(2);
+    const secondArg = hookState.send.mock.calls[1][0];
+    // The follow-up must carry the build seed's original description forward,
+    // not just the bare "#eng" answer.
+    expect(secondArg.request.instruction).toContain('post a daily summary to slack');
+    expect(secondArg.request.instruction).toContain('#eng');
   });
 });

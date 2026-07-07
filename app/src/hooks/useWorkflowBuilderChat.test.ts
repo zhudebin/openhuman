@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BuilderTurnResult } from '../services/api/flowsApi';
 import type { WorkflowProposal } from '../store/chatRuntimeSlice';
+import type { ThreadMessage } from '../types/thread';
 import { useWorkflowBuilderChat } from './useWorkflowBuilderChat';
 
 // The hook now runs the builder server-side via `openhuman.flows_build`.
@@ -41,6 +42,15 @@ vi.mock('../store/chatRuntimeSlice', () => ({
   setWorkflowProposalForThread: (p: unknown) => ({ type: 'setProposal', p }),
 }));
 
+// The hook reads the live store directly (not the stale closed-over selector
+// value) to dedup against a message the streamed `chat_done` path may have
+// already appended for this exact turn — see the `assistantText` fallback
+// branch. Controllable per test via `rawStoreState.thread.messagesByThreadId`.
+const rawStoreState = vi.hoisted(() => ({
+  thread: { messagesByThreadId: {} as Record<string, { sender: string; content: string }[]> },
+}));
+vi.mock('../store', () => ({ store: { getState: () => rawStoreState } }));
+
 const okResult = (over: Partial<BuilderTurnResult> = {}): BuilderTurnResult => ({
   proposal: null,
   assistantText: 'done',
@@ -55,6 +65,7 @@ describe('useWorkflowBuilderChat', () => {
     selectorState.messagesByThreadId = {};
     selectorState.toolTimelineByThread = {};
     selectorState.streamingAssistantByThread = {};
+    rawStoreState.thread.messagesByThreadId = {};
     dispatch.mockReset().mockImplementation((action: { type: string }) => {
       if (action.type === 'createNewThread') {
         return { unwrap: () => Promise.resolve({ id: 'builder-1' }) };
@@ -113,7 +124,13 @@ describe('useWorkflowBuilderChat', () => {
     );
   });
 
-  it('appends only the user turn locally — the runtime owns the agent reply', async () => {
+  it('appends the user turn locally — the runtime normally owns the agent reply', async () => {
+    // Simulate the streamed path already having delivered this exact text via
+    // `chat_done` (the normal case when streaming is wired) so the fallback
+    // branch below can prove it does NOT double the bubble.
+    rawStoreState.thread.messagesByThreadId = {
+      'builder-1': [{ sender: 'agent', content: 'Here is your workflow.' }],
+    };
     buildWorkflow.mockResolvedValue(okResult({ assistantText: 'Here is your workflow.' }));
     const { result } = renderHook(() => useWorkflowBuilderChat());
     await act(async () => {
@@ -128,9 +145,73 @@ describe('useWorkflowBuilderChat', () => {
     // The web channel never persists user messages, so the hook appends the
     // user turn itself...
     expect(appended.some(a => a.p?.message?.sender === 'user')).toBe(true);
-    // ...but NOT the agent reply — `ChatRuntimeProvider` appends that on the
-    // streamed `chat_done`, so appending here too would double it.
+    // ...but NOT the agent reply when it was already streamed — appending
+    // here too would double it.
     expect(appended.some(a => a.p?.message?.sender === 'agent')).toBe(false);
+  });
+
+  it('surfaces a clarifying question as an assistant message when the builder returns plain text with no proposal (fallback)', async () => {
+    buildWorkflow.mockResolvedValue(
+      okResult({
+        proposal: null,
+        error: null,
+        assistantText: 'Which Slack channel — #eng or #sales?',
+      })
+    );
+    const { result } = renderHook(() => useWorkflowBuilderChat());
+    await act(async () => {
+      await result.current.send({
+        displayText: 'post a daily summary to slack',
+        request: { mode: 'create', instruction: 'post a daily summary to slack' },
+      });
+    });
+
+    const appendedAgentMessages = dispatch.mock.calls
+      .map(([a]) => a as { type: string; p?: { threadId?: string; message?: ThreadMessage } })
+      .filter(a => a.type === 'addMessageLocal' && a.p?.message?.sender === 'agent');
+    expect(appendedAgentMessages).toHaveLength(1);
+    expect(appendedAgentMessages[0]?.p?.message?.content).toBe(
+      'Which Slack channel — #eng or #sales?'
+    );
+    expect(appendedAgentMessages[0]?.p?.threadId).toBe('builder-1');
+    // No proposal was surfaced for this turn.
+    expect(dispatch.mock.calls.some(([a]) => (a as { type: string }).type === 'setProposal')).toBe(
+      false
+    );
+  });
+
+  it('does not double-append when a proposal is returned alongside assistant text', async () => {
+    const proposal: WorkflowProposal = {
+      name: 'Digest',
+      graph: { nodes: [], edges: [] },
+      requireApproval: true,
+      summary: { trigger: 'schedule', steps: [] },
+    };
+    buildWorkflow.mockResolvedValue(
+      okResult({ proposal, assistantText: "I've built this — review below." })
+    );
+    const { result } = renderHook(() => useWorkflowBuilderChat());
+    await act(async () => {
+      await result.current.send({
+        displayText: 'hi',
+        request: { mode: 'create', instruction: 'x' },
+      });
+    });
+
+    // A proposal result still sets the proposal, unchanged...
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'setProposal', p: { threadId: 'builder-1', proposal } })
+    );
+    // ...and does NOT also append an agent chat message (the proposal branch
+    // is exclusive of the assistant-text fallback branch).
+    expect(
+      dispatch.mock.calls.some(
+        ([a]) =>
+          (a as { type: string; p?: { message?: { sender?: string } } }).type ===
+            'addMessageLocal' &&
+          (a as { p?: { message?: { sender?: string } } }).p?.message?.sender === 'agent'
+      )
+    ).toBe(false);
   });
 
   it('reuses the same dedicated thread across sends (creates it once)', async () => {
