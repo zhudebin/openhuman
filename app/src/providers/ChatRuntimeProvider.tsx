@@ -324,10 +324,10 @@ function parseWorkflowProposal(output: string): WorkflowProposal | null {
   return {
     name: obj.name,
     graph: obj.graph,
-    // The Rust tool defaults `require_approval` to `true` when the caller
-    // omits it, so treat anything other than an explicit `false` as `true`
-    // here too — keeps the client's fallback in lockstep with the server's.
-    requireApproval: obj.require_approval !== false,
+    // require_approval defaults to `false` — a proposal only requires approval
+    // if the builder explicitly set it — so treat anything other than an
+    // explicit `true` as `false`, in lockstep with the server default.
+    requireApproval: obj.require_approval === true,
     summary: { trigger: typeof summary.trigger === 'string' ? summary.trigger : '', steps },
   };
 }
