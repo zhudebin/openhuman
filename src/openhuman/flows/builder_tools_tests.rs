@@ -658,6 +658,15 @@ async fn dry_run_flags_tool_call_error_when_on_error_is_route() {
     // got far enough to trace an `=`-expression before the preflight error).
     // Seed the same schema as `dry_run_catches_unwired_required_composio_arg`
     // (process-global cache; keep the arg list identical across tests).
+    //
+    // The graph must give `post`'s `error` port a real destination: vendored
+    // tinyflows' author-time `validate()` (added alongside per-node error
+    // handling — a graph with `on_error: "route"` but no outgoing `error`-port
+    // edge is now rejected up front, since a route with nowhere to go is
+    // always a dead-end) would otherwise reject this graph before the sandbox
+    // run ever starts, which is a different failure mode than the one this
+    // test targets. `recover` is a no-op sink, same convention as
+    // `dry_run_passes_when_tool_call_binds_to_upstream_tool_output` above.
     seed_live_catalog_cache("gmail", vec![seeded_gmail_send_contract()]);
 
     let tool = DryRunWorkflowTool::new(
@@ -669,9 +678,14 @@ async fn dry_run_flags_tool_call_error_when_on_error_is_route() {
             { "id": "t", "kind": "trigger", "name": "Manual" },
             { "id": "post", "kind": "tool_call", "name": "Send email",
               "config": { "slug": "GMAIL_SEND_EMAIL", "on_error": "route",
-                "args": { "to": "=item.email", "body": "hello" } } }
+                "args": { "to": "=item.email", "body": "hello" } } },
+            { "id": "recover", "kind": "tool_call", "name": "Recover",
+              "config": { "slug": "oh:noop", "args": {} } }
         ],
-        "edges": [ { "from_node": "t", "to_node": "post" } ]
+        "edges": [
+            { "from_node": "t", "to_node": "post" },
+            { "from_node": "post", "from_port": "error", "to_node": "recover" }
+        ]
     });
 
     // `to` misses (trigger input has no `email`) — a real run would fail the
