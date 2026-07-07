@@ -1789,6 +1789,44 @@ pub(crate) async fn preflight_composio_args(
     )))
 }
 
+/// Turns a Composio execute response that reports a provider-side failure
+/// into a real capability error.
+///
+/// The Composio execute endpoint is a "successful HTTP request describing an
+/// unsuccessful tool call" API: a transport-level failure (network error, 5xx,
+/// bad JSON) already surfaces as `Err` via `?` in [`OpenHumanTools::invoke`],
+/// but a 200 response whose body is `{successful: false, error: "..."}` (e.g.
+/// Slack rejecting `SLACK_SEND_MESSAGE` with a 400 "Invalid request data")
+/// comes back as `Ok(ComposioExecuteResponse)` — nothing downstream ever
+/// inspected `successful`, so the tinyflows engine recorded the step (and
+/// therefore the run) as `Success`/`"completed"` even though the requested
+/// action never actually happened upstream.
+///
+/// Called on every Composio response (never on native `oh:` tool results,
+/// which don't carry this envelope and return earlier in `invoke`). A
+/// genuinely successful response (`successful: true`) passes through
+/// unchanged; an unsuccessful one becomes `Err(EngineError::Capability(_))`,
+/// which the engine turns into `StepStatus::Error` and — via
+/// `degrade_completed_status` — a degraded/failed run instead of a false
+/// "Completed".
+fn reject_unsuccessful_composio_response(
+    slug: &str,
+    resp: crate::openhuman::composio::ComposioExecuteResponse,
+) -> Result<crate::openhuman::composio::ComposioExecuteResponse> {
+    if resp.successful {
+        return Ok(resp);
+    }
+    let detail = resp
+        .error
+        .as_deref()
+        .map(str::trim)
+        .filter(|e| !e.is_empty())
+        .unwrap_or("no error detail returned by the provider");
+    Err(EngineError::Capability(format!(
+        "tool_call `{slug}` failed at the connected provider: {detail}"
+    )))
+}
+
 /// A [`ToolInvoker`] decorator that runs the host's Composio required-arg
 /// preflight before delegating to `inner`.
 ///
@@ -1996,6 +2034,12 @@ impl ToolInvoker for OpenHumanTools {
                 .map_err(|e| EngineError::Capability(e.to_string()))
             }
         };
+
+        // A successful HTTP round-trip can still carry a provider-side failure
+        // (`{successful: false, error: "..."}`, e.g. a Slack 400 on
+        // `SLACK_SEND_MESSAGE`) — reject it into a real capability error, see
+        // `reject_unsuccessful_composio_response`'s doc.
+        let response = response.and_then(|resp| reject_unsuccessful_composio_response(slug, resp));
 
         if let Some(id) = audit_id {
             if let Some(gate) = crate::openhuman::approval::ApprovalGate::try_global() {
@@ -2588,7 +2632,61 @@ pub fn open_flow_checkpointer(
 mod tests {
     use super::*;
     use crate::openhuman::agent::prompts::types::IntegrationConnection;
-    use crate::openhuman::composio::ConnectedIntegration;
+    use crate::openhuman::composio::{ComposioExecuteResponse, ConnectedIntegration};
+
+    // ── reject_unsuccessful_composio_response (B6) ──────────────────────────
+
+    #[test]
+    fn reject_unsuccessful_composio_response_errors_on_provider_failure() {
+        // Live-observed shape: SLACK_SEND_MESSAGE 400s upstream but the
+        // Composio execute call itself still returns HTTP 200.
+        let resp = ComposioExecuteResponse {
+            data: json!({}),
+            successful: false,
+            error: Some("Invalid request data".to_string()),
+            cost_usd: 0.0,
+            markdown_formatted: None,
+        };
+        let err = reject_unsuccessful_composio_response("SLACK_SEND_MESSAGE", resp)
+            .expect_err("unsuccessful response must become an Err");
+        let msg = err.to_string();
+        assert!(msg.contains("SLACK_SEND_MESSAGE"), "message was: {msg}");
+        assert!(msg.contains("Invalid request data"), "message was: {msg}");
+    }
+
+    #[test]
+    fn reject_unsuccessful_composio_response_falls_back_when_error_field_is_empty() {
+        let resp = ComposioExecuteResponse {
+            data: json!({}),
+            successful: false,
+            error: None,
+            cost_usd: 0.0,
+            markdown_formatted: None,
+        };
+        let err = reject_unsuccessful_composio_response("GMAIL_SEND_EMAIL", resp)
+            .expect_err("unsuccessful response must become an Err");
+        let msg = err.to_string();
+        assert!(msg.contains("GMAIL_SEND_EMAIL"), "message was: {msg}");
+        assert!(
+            msg.contains("no error detail returned by the provider"),
+            "message was: {msg}"
+        );
+    }
+
+    #[test]
+    fn reject_unsuccessful_composio_response_passes_through_on_success() {
+        let resp = ComposioExecuteResponse {
+            data: json!({ "ts": "123.456" }),
+            successful: true,
+            error: None,
+            cost_usd: 0.002,
+            markdown_formatted: None,
+        };
+        let ok = reject_unsuccessful_composio_response("SLACK_SEND_MESSAGE", resp.clone())
+            .expect("successful response must remain Ok");
+        assert!(ok.successful);
+        assert_eq!(ok.data, resp.data);
+    }
 
     // ── input_context (PR A) ────────────────────────────────────────────────
 
